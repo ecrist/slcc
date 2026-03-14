@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useSession, signIn } from "next-auth/react";
 import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 import SquareWalletButtons from "@/components/SquareWalletButtons";
 
 type PaymentProvider = "square" | "quickbooks" | "wallet";
 
 export default function MembershipsPage() {
+  const { data: session } = useSession();
   const [selectedType, setSelectedType] = useState<MembershipType | null>(null);
   const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>("wallet");
   const [form, setForm] = useState({
@@ -138,8 +140,31 @@ export default function MembershipsPage() {
         )}
       </div>
 
+      {/* Sign-in gate — required before payment */}
+      {selectedType && !session && (
+        <div className="max-w-md mx-auto">
+          <div className="card text-center">
+            <svg className="h-12 w-12 mx-auto mb-3 text-swan-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <h2 className="text-xl font-bold mb-2">Sign in to continue</h2>
+            <p className="text-gray-500 text-sm mb-5">
+              An account is required to purchase a{" "}
+              <strong>{MEMBERSHIP_TYPES[selectedType].name}</strong> membership.
+              This keeps your membership record tied to your account.
+            </p>
+            <button onClick={() => signIn(undefined, { callbackUrl: "/memberships" })} className="btn-primary w-full mb-3">
+              Sign In
+            </button>
+            <a href={`/register?callbackUrl=${encodeURIComponent("/memberships")}`} className="block text-sm text-swan-green hover:underline">
+              Don&apos;t have an account? Register free
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Registration Form */}
-      {selectedType && (
+      {selectedType && session && (
         <div className="max-w-2xl mx-auto">
           <div className="card">
             <h2 className="text-2xl font-bold text-swan-green mb-1">
