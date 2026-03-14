@@ -63,9 +63,16 @@ export default function TeeTimesPage() {
   const slotsNeeded = slotsNeededForPlayers(players);
   const bookedTimes = new Set(bookedSlots.map((s) => s.time));
 
-  const maxCarts = equipment ? Math.min(equipment.cartsAvailable, Math.ceil(players / 2)) : 0;
-  const maxBuggies = equipment ? Math.min(equipment.buggiesAvailable, players) : 0;
-  const maxClubs = equipment ? Math.min(equipment.clubsAvailable, players) : 0;
+  // When inventory is tracked (total > 0), cap by available units; otherwise cap by party size only
+  const maxCarts = equipment
+    ? (equipment.cartTotal > 0 ? Math.min(equipment.cartsAvailable, Math.ceil(players / 2)) : Math.ceil(players / 2))
+    : Math.ceil(players / 2);
+  const maxBuggies = equipment
+    ? (equipment.buggyTotal > 0 ? Math.min(equipment.buggiesAvailable, players) : players)
+    : players;
+  const maxClubs = equipment
+    ? (equipment.clubsTotal > 0 ? Math.min(equipment.clubsAvailable, players) : players)
+    : players;
 
   useEffect(() => {
     if (bookingSlot) {
@@ -393,79 +400,91 @@ export default function TeeTimesPage() {
                   </select>
                 </div>
 
-                {/* Equipment */}
+                {/* Equipment — always shown once fees are loaded */}
                 {equipment && (
                   <div className="border-t border-gray-100 pt-4 space-y-3">
                     <p className="text-sm font-semibold text-gray-700">Equipment (optional)</p>
 
                     {/* Golf carts */}
-                    {equipment.cartTotal > 0 && (
-                      <div>
-                        <label className="text-sm text-gray-700 block mb-1">
-                          Golf cart rental
-                          <span className="ml-1 text-gray-400 text-xs">
-                            ${equipment.cartFeePerNine}/9 holes · {equipment.cartsAvailable} available
-                          </span>
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <select className="input-field w-20" value={form.carts}
-                            disabled={equipment.cartsAvailable === 0}
-                            onChange={(e) => setForm({ ...form, carts: parseInt(e.target.value) })}>
-                            {Array.from({ length: maxCarts + 1 }, (_, i) => (
-                              <option key={i} value={i}>{i}</option>
-                            ))}
-                          </select>
-                          <span className="text-xs text-gray-500">cart{form.carts !== 1 ? "s" : ""} (1 per 2 players)</span>
-                        </div>
-                        {equipment.cartsAvailable === 0 && (
-                          <p className="text-xs text-red-600 mt-1">No carts available this day</p>
-                        )}
+                    <div>
+                      <label className="text-sm text-gray-700 block mb-1">
+                        Golf cart rental
+                        <span className="ml-1 text-gray-400 text-xs">
+                          ${equipment.cartFeePerNine}/9 holes
+                          {equipment.cartTotal > 0 && ` · ${equipment.cartsAvailable} of ${equipment.cartTotal} available`}
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="input-field w-20"
+                          value={form.carts}
+                          disabled={equipment.cartTotal > 0 && equipment.cartsAvailable === 0}
+                          onChange={(e) => setForm({ ...form, carts: parseInt(e.target.value) })}
+                        >
+                          {Array.from({ length: maxCarts + 1 }, (_, i) => (
+                            <option key={i} value={i}>{i}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-500">cart{form.carts !== 1 ? "s" : ""} (1 per 2 players)</span>
                       </div>
-                    )}
+                      {equipment.cartTotal > 0 && equipment.cartsAvailable === 0 && (
+                        <p className="text-xs text-red-600 mt-1">No carts available this day</p>
+                      )}
+                    </div>
 
                     {/* Walking buggies */}
-                    {equipment.buggyTotal > 0 && (
-                      <div>
-                        <label className="text-sm text-gray-700 block mb-1">
-                          Walking buggy (push/pull)
-                          <span className="ml-1 text-gray-400 text-xs">
-                            ${equipment.buggyFee} · {equipment.buggiesAvailable} available
-                          </span>
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <select className="input-field w-20" value={form.buggies}
-                            disabled={equipment.buggiesAvailable === 0}
-                            onChange={(e) => setForm({ ...form, buggies: parseInt(e.target.value) })}>
-                            {Array.from({ length: maxBuggies + 1 }, (_, i) => (
-                              <option key={i} value={i}>{i}</option>
-                            ))}
-                          </select>
-                          <span className="text-xs text-gray-500">buggy/buggies</span>
-                        </div>
+                    <div>
+                      <label className="text-sm text-gray-700 block mb-1">
+                        Walking buggy (push/pull)
+                        <span className="ml-1 text-gray-400 text-xs">
+                          ${equipment.buggyFee}
+                          {equipment.buggyTotal > 0 && ` · ${equipment.buggiesAvailable} of ${equipment.buggyTotal} available`}
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="input-field w-20"
+                          value={form.buggies}
+                          disabled={equipment.buggyTotal > 0 && equipment.buggiesAvailable === 0}
+                          onChange={(e) => setForm({ ...form, buggies: parseInt(e.target.value) })}
+                        >
+                          {Array.from({ length: maxBuggies + 1 }, (_, i) => (
+                            <option key={i} value={i}>{i}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-500">buggy/buggies</span>
                       </div>
-                    )}
+                      {equipment.buggyTotal > 0 && equipment.buggiesAvailable === 0 && (
+                        <p className="text-xs text-red-600 mt-1">No buggies available this day</p>
+                      )}
+                    </div>
 
                     {/* Club rentals */}
-                    {equipment.clubsTotal > 0 && (
-                      <div>
-                        <label className="text-sm text-gray-700 block mb-1">
-                          Club rental (full set)
-                          <span className="ml-1 text-gray-400 text-xs">
-                            ${equipment.clubsFee}/set · {equipment.clubsAvailable} available
-                          </span>
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <select className="input-field w-20" value={form.clubs}
-                            disabled={equipment.clubsAvailable === 0}
-                            onChange={(e) => setForm({ ...form, clubs: parseInt(e.target.value) })}>
-                            {Array.from({ length: maxClubs + 1 }, (_, i) => (
-                              <option key={i} value={i}>{i}</option>
-                            ))}
-                          </select>
-                          <span className="text-xs text-gray-500">set{form.clubs !== 1 ? "s" : ""}</span>
-                        </div>
+                    <div>
+                      <label className="text-sm text-gray-700 block mb-1">
+                        Club rental (full set)
+                        <span className="ml-1 text-gray-400 text-xs">
+                          ${equipment.clubsFee}/set
+                          {equipment.clubsTotal > 0 && ` · ${equipment.clubsAvailable} of ${equipment.clubsTotal} available`}
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="input-field w-20"
+                          value={form.clubs}
+                          disabled={equipment.clubsTotal > 0 && equipment.clubsAvailable === 0}
+                          onChange={(e) => setForm({ ...form, clubs: parseInt(e.target.value) })}
+                        >
+                          {Array.from({ length: maxClubs + 1 }, (_, i) => (
+                            <option key={i} value={i}>{i}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-500">set{form.clubs !== 1 ? "s" : ""}</span>
                       </div>
-                    )}
+                      {equipment.clubsTotal > 0 && equipment.clubsAvailable === 0 && (
+                        <p className="text-xs text-red-600 mt-1">No club sets available this day</p>
+                      )}
+                    </div>
 
                     {/* Personal cart drop fee */}
                     <label className="flex items-start gap-2 cursor-pointer">
@@ -490,7 +509,7 @@ export default function TeeTimesPage() {
                   <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
                     {cost.cartCost > 0 && (
                       <div className="flex justify-between text-gray-600">
-                        <span>{form.carts} cart{form.carts > 1 ? "s" : ""} × ${equipment?.cartFeePerNine}/{form.holes === "9" ? "9" : "18"} holes</span>
+                        <span>{form.carts} cart{form.carts > 1 ? "s" : ""} × ${equipment?.cartFeePerNine}/9 holes × {form.holes === "9" ? 1 : 2} nines</span>
                         <span>${cost.cartCost.toFixed(2)}</span>
                       </div>
                     )}
