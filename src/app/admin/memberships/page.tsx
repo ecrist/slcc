@@ -4,14 +4,19 @@ import { useState, useEffect } from "react";
 import type { Membership } from "@/lib/types";
 import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 
+interface MembershipWithNfc extends Membership {
+  nfc_token: string | null;
+}
+
 export default function AdminMemberships() {
-  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [memberships, setMemberships] = useState<MembershipWithNfc[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [nfcModal, setNfcModal] = useState<MembershipWithNfc | null>(null);
+  const [nfcWriting, setNfcWriting] = useState(false);
+  const [nfcMsg, setNfcMsg] = useState("");
 
-  useEffect(() => {
-    fetchMemberships();
-  }, []);
+  useEffect(() => { fetchMemberships(); }, []);
 
   async function fetchMemberships() {
     try {
@@ -29,6 +34,37 @@ export default function AdminMemberships() {
   const totalRevenue = memberships
     .filter((m) => m.payment_status === "paid")
     .reduce((sum, m) => sum + (m.amount_paid || 0), 0);
+
+  async function generateNfcToken(m: MembershipWithNfc) {
+    const res = await fetch(`/api/admin/memberships/nfc?id=${m.id}`, { method: "POST" });
+    if (res.ok) {
+      const { nfc_token } = await res.json();
+      const updated = { ...m, nfc_token };
+      setNfcModal(updated);
+      setMemberships((prev) => prev.map((x) => x.id === m.id ? updated : x));
+    }
+  }
+
+  async function writeWebNfc(token: string) {
+    if (!("NDEFReader" in window)) {
+      setNfcMsg("Web NFC is not available in this browser. Copy the token and use a dedicated NFC writer.");
+      return;
+    }
+    setNfcWriting(true);
+    setNfcMsg("Tap a blank NFC tag to write…");
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ndef = new (window as any).NDEFReader();
+      await ndef.write({ records: [{ recordType: "text", data: token }] });
+      setNfcMsg("✓ Tag written successfully!");
+    } catch {
+      setNfcMsg("Write failed or cancelled. Try again.");
+    } finally {
+      setNfcWriting(false);
+    }
+  }
+
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -89,6 +125,7 @@ export default function AdminMemberships() {
                 <th className="px-4 py-3 text-center text-sm font-medium">Amount</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Payment</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Status</th>
+                <th className="px-4 py-3 text-center text-sm font-medium">NFC Card</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -124,10 +161,97 @@ export default function AdminMemberships() {
                       {m.status}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    {m.nfc_token ? (
+                      <button
+                        onClick={() => { setNfcModal(m); setNfcMsg(""); }}
+                        className="text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 px-2 py-1 rounded font-medium"
+                      >
+                        View Card
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => generateNfcToken(m)}
+                        className="text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 px-2 py-1 rounded font-medium"
+                      >
+                        Issue Card
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* NFC Token Modal */}
+      {nfcModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-swan-green">NFC Card — {nfcModal.first_name} {nfcModal.last_name}</h2>
+              <button onClick={() => { setNfcModal(null); setNfcMsg(""); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Program a blank NFC tag with this token, or with the URL below. Members tap the
+              card to the desk reader to check in instantly.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Token (plain text payload)</label>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 truncate">
+                    {nfcModal.nfc_token}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(nfcModal.nfc_token!)}
+                    className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded font-medium shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">iOS URL (tap-to-open for iPhone/iPad)</label>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 truncate">
+                    {siteUrl}/desk/nfc/{nfcModal.nfc_token}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(`${siteUrl}/desk/nfc/${nfcModal.nfc_token}`)}
+                    className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded font-medium shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {nfcMsg && (
+              <p className={`mt-3 text-sm text-center ${nfcMsg.startsWith("✓") ? "text-green-700" : "text-gray-600"}`}>
+                {nfcMsg}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => writeWebNfc(nfcModal.nfc_token!)}
+                disabled={nfcWriting}
+                className="btn-primary w-full"
+              >
+                {nfcWriting ? "Writing…" : "Write Tag via Web NFC (Chrome / Android)"}
+              </button>
+              <button
+                onClick={() => generateNfcToken(nfcModal)}
+                className="w-full py-2 text-sm text-red-600 hover:text-red-800 font-medium"
+              >
+                Regenerate Token (invalidates existing cards)
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

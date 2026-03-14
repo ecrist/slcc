@@ -107,6 +107,25 @@ function initializeDatabase(db: Database.Database) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS checkins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL DEFAULT 'walk_in',
+      name TEXT NOT NULL,
+      email TEXT,
+      players INTEGER NOT NULL DEFAULT 1,
+      holes INTEGER NOT NULL DEFAULT 18,
+      carts_requested INTEGER NOT NULL DEFAULT 0,
+      buggies_requested INTEGER NOT NULL DEFAULT 0,
+      clubs_requested INTEGER NOT NULL DEFAULT 0,
+      personal_cart_drop INTEGER NOT NULL DEFAULT 0,
+      membership_id INTEGER,
+      tee_time_id INTEGER,
+      notes TEXT,
+      checked_in_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (membership_id) REFERENCES memberships(id),
+      FOREIGN KEY (tee_time_id) REFERENCES tee_times(id)
+    );
+
     CREATE TABLE IF NOT EXISTS equipment (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
@@ -121,6 +140,7 @@ function initializeDatabase(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
     CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(status);
     CREATE INDEX IF NOT EXISTS idx_equipment_type ON equipment(type);
+    CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(checked_in_at);
 
     -- Unique partial index: prevents two active bookings for the same slot at the DB level.
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tee_times_unique_active
@@ -135,6 +155,9 @@ function initializeDatabase(db: Database.Database) {
     "ALTER TABLE tee_times ADD COLUMN buggies_requested INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE tee_times ADD COLUMN clubs_requested INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE tee_times ADD COLUMN personal_cart_drop INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tee_times ADD COLUMN checked_in INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tee_times ADD COLUMN checked_in_at TEXT",
+    "ALTER TABLE memberships ADD COLUMN nfc_token TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

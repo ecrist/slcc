@@ -38,6 +38,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               Settings
             </Link>
             <div className="flex-1" />
+            <Link href="/desk" className="text-swan-gold hover:text-swan-gold-light whitespace-nowrap font-medium">
+              Desk Mode
+            </Link>
             <Link href="/" className="text-gray-400 hover:text-white whitespace-nowrap">
               View Site
             </Link>
