@@ -1,0 +1,10 @@
+PLACEHOLDER - Replace this file with the real Apple Pay domain association file from Square.
+
+Instructions:
+1. Log in to Square Developer Dashboard: https://developer.squareup.com/apps
+2. Go to your app → Apple Pay tab
+3. Register your production domain (e.g. book.swanlakecc.com)
+4. Download the domain association file Square provides
+5. Replace this file with that downloaded file (no extension, no changes to content)
+
+Apple Pay will not work until this is done.

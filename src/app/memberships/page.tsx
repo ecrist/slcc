@@ -1,0 +1,249 @@
+"use client";
+
+import { useState } from "react";
+import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
+import SquareWalletButtons from "@/components/SquareWalletButtons";
+
+type PaymentProvider = "square" | "quickbooks" | "wallet";
+
+export default function MembershipsPage() {
+  const [selectedType, setSelectedType] = useState<MembershipType | null>(null);
+  const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>("wallet");
+  const [form, setForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "MN",
+    zip: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  async function handleWalletToken(token: string) {
+    if (!selectedType) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/payments/square/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          ...form,
+          membership_type: selectedType,
+          amount: MEMBERSHIP_TYPES[selectedType].price,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult({
+          type: "success",
+          message: `Payment successful! Your member number is ${data.member_number}. Welcome to Swan Lake Country Club!`,
+        });
+        setSelectedType(null);
+        setForm({ first_name: "", last_name: "", email: "", phone: "", address: "", city: "", state: "MN", zip: "" });
+      } else {
+        setResult({ type: "error", message: data.error || "Payment failed" });
+      }
+    } catch {
+      setResult({ type: "error", message: "Network error. Please try again." });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedType) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/memberships", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          membership_type: selectedType,
+          payment_provider: paymentProvider,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.payment_url) {
+          window.location.href = data.payment_url;
+        } else {
+          setResult({
+            type: "success",
+            message: `Membership application submitted! Your member number is ${data.member_number}. You will receive payment instructions by email.`,
+          });
+          setSelectedType(null);
+          setForm({ first_name: "", last_name: "", email: "", phone: "", address: "", city: "", state: "MN", zip: "" });
+        }
+      } else {
+        setResult({ type: "error", message: data.error || "Failed to submit membership" });
+      }
+    } catch {
+      setResult({ type: "error", message: "Network error. Please try again." });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const price = selectedType ? MEMBERSHIP_TYPES[selectedType].price : 0;
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <h1 className="section-title">Annual Memberships</h1>
+      <p className="text-gray-600 mb-10 max-w-2xl">
+        Join Swan Lake Country Club and enjoy unlimited golf all season long.
+        All memberships run from May 1 through October 31, 2026.
+      </p>
+
+      {result && (
+        <div className={`mb-6 p-4 rounded-lg ${result.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+          {result.message}
+        </div>
+      )}
+
+      {/* Membership Tiers */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {(Object.entries(MEMBERSHIP_TYPES) as [MembershipType, typeof MEMBERSHIP_TYPES[MembershipType]][]).map(
+          ([key, tier]) => (
+            <button
+              key={key}
+              onClick={() => setSelectedType(key)}
+              className={`card text-left transition-all ${
+                selectedType === key ? "ring-2 ring-swan-green shadow-lg" : "hover:shadow-lg"
+              }`}
+            >
+              <h3 className="text-xl font-bold text-swan-green mb-1">{tier.name}</h3>
+              <p className="text-3xl font-bold text-swan-dark mb-2">
+                ${tier.price}
+                <span className="text-sm font-normal text-gray-500">/season</span>
+              </p>
+              <p className="text-gray-600 text-sm">{tier.description}</p>
+              {selectedType === key && (
+                <div className="mt-3 text-swan-green font-medium text-sm flex items-center gap-1">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Selected
+                </div>
+              )}
+            </button>
+          )
+        )}
+      </div>
+
+      {/* Registration Form */}
+      {selectedType && (
+        <div className="max-w-2xl mx-auto">
+          <div className="card">
+            <h2 className="text-2xl font-bold text-swan-green mb-1">
+              {MEMBERSHIP_TYPES[selectedType].name} Membership
+            </h2>
+            <p className="text-gray-500 mb-6">
+              ${MEMBERSHIP_TYPES[selectedType].price} for the 2026 season
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                  <input type="text" required className="input-field" value={form.first_name}
+                    onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <input type="text" required className="input-field" value={form.last_name}
+                    onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input type="email" required className="input-field" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input type="tel" className="input-field" value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input type="text" className="input-field" value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <input type="text" className="input-field" value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                  <input type="text" className="input-field" value={form.state}
+                    onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                  <input type="text" className="input-field" value={form.zip}
+                    onChange={(e) => setForm({ ...form, zip: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Payment Method</label>
+
+                {/* Google Pay / Apple Pay (auto-detected) */}
+                <SquareWalletButtons
+                  price={price}
+                  label={`${MEMBERSHIP_TYPES[selectedType].name} Membership`}
+                  onToken={handleWalletToken}
+                  onError={(msg) => setResult({ type: "error", message: msg })}
+                />
+
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <label className={`card cursor-pointer text-center transition-all py-3 ${paymentProvider === "square" ? "ring-2 ring-swan-green" : ""}`}>
+                    <input type="radio" name="payment" value="square" checked={paymentProvider === "square"}
+                      onChange={() => setPaymentProvider("square")} className="sr-only" />
+                    <div className="font-bold mb-0.5">Credit / Debit</div>
+                    <div className="text-xs text-gray-500">via Square</div>
+                  </label>
+                  <label className={`card cursor-pointer text-center transition-all py-3 ${paymentProvider === "quickbooks" ? "ring-2 ring-swan-green" : ""}`}>
+                    <input type="radio" name="payment" value="quickbooks" checked={paymentProvider === "quickbooks"}
+                      onChange={() => setPaymentProvider("quickbooks")} className="sr-only" />
+                    <div className="font-bold mb-0.5">Invoice / ACH</div>
+                    <div className="text-xs text-gray-500">via QuickBooks</div>
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" disabled={submitting} className="btn-primary w-full text-lg">
+                {submitting
+                  ? "Processing..."
+                  : paymentProvider === "quickbooks"
+                  ? `Request Invoice – $${price}`
+                  : `Pay $${price} with ${paymentProvider === "square" ? "Card" : "Card"}`}
+              </button>
+
+              <p className="text-xs text-gray-400 text-center">
+                {paymentProvider === "quickbooks"
+                  ? "An invoice will be sent to your email via QuickBooks Payments."
+                  : "Payment processed securely via Square."}
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
