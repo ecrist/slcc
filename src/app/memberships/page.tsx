@@ -21,6 +21,7 @@ export default function MembershipsPage() {
     state: "MN",
     zip: "",
   });
+  const [saveCard, setSaveCard] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -37,6 +38,7 @@ export default function MembershipsPage() {
           ...form,
           membership_type: selectedType,
           amount: MEMBERSHIP_TYPES[selectedType].price,
+          save_card: saveCard,
         }),
       });
       const data = await res.json();
@@ -251,6 +253,22 @@ export default function MembershipsPage() {
                   </label>
                 </div>
               </div>
+
+              {/* Auto-renewal opt-in (only relevant for Square card payment) */}
+              {paymentProvider === "square" && (
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={saveCard}
+                    onChange={(e) => setSaveCard(e.target.checked)}
+                  />
+                  <span className="text-sm text-gray-700">
+                    <span className="font-medium">Enable auto-renewal</span> — save my card for automatic renewal next season.
+                    You can cancel anytime by contacting the clubhouse.
+                  </span>
+                </label>
+              )}
 
               <button type="submit" disabled={submitting} className="btn-primary w-full text-lg">
                 {submitting

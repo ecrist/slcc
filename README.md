@@ -26,6 +26,43 @@ An online booking and membership portal for [Swan Lake Country Club](https://www
 - **Credit/debit card** via Square hosted checkout
 - **Invoice / ACH** via QuickBooks Payments
 
+### Transactional Email
+- Automatic email confirmations sent via SMTP (Nodemailer) for:
+  - **Tee time bookings** — date, time, players, equipment booked
+  - **Membership purchases** — member number, tier, amount, season dates
+  - **Tournament registrations** — event details, format, entry fee
+  - **Membership renewal reminders** — sent manually or auto-triggered from the billing dashboard
+- Configurable via the Admin → Settings page (stored in the database, no rebuild required)
+- Gracefully no-ops if SMTP is not configured (logs a warning, never crashes)
+
+### Recurring Membership Billing
+- Members can opt in to **auto-renewal** at checkout by checking "Save card for auto-renewal"
+- Card tokenized with Square's Card on File API (`cardsApi.createCard`) — no raw PAN is stored
+- **Admin billing dashboard** at `/admin/billing`:
+  - Lists all memberships expiring within 30 days
+  - Shows which have a saved card ("auto-renewal ready") vs. not
+  - Select-all / bulk charge — processes saved cards and creates a new membership record for the next season
+  - "Send Renewal Reminders" — emails members without a card on file with a renewal link
+- Cron-safe endpoint at `POST /api/admin/billing/renew?secret=CRON_SECRET` — can be called from a cron job to auto-charge on a schedule without a browser session
+
+### Tournaments
+- Full tournament engine supporting six formats:
+  - **Luck of the Draw** — individual registration, admin runs a blind random draw to create teams
+  - **Scramble** — captain's choice; same draw algorithm
+  - **Best Ball** — team format; draw assigns teams
+  - **Stroke Play** — individual gross/net scoring
+  - **Stableford** — individual points scoring
+  - **Match Play** — head-to-head bracket
+- **Public registration** at `/tournaments` — anyone can register; email confirmation sent on sign-up
+- **Handicap entry** — optional field on registration, used for net scoring
+- **Admin draw tool** (`/admin/tournaments/[id]`):
+  - Run (or re-run) the blind draw with one click — shuffles players with SQLite `ORDER BY RANDOM()` and groups into teams of configurable size (2, 3, or 4)
+  - Partial groups handled: leftover players distributed evenly across existing teams rather than leaving an undersized final team
+  - Assign tee times to teams: pick start time, interval, and starting hole — bulk-assigns sequentially
+- **Score entry** — admin enters gross and net scores per team inline; leaderboard auto-ranks and shows places
+- **Status workflow**: Registration Open → Closed → Draw Complete → Scoring → Completed
+- Public leaderboard and team/draw results visible on the tournament detail page once available
+
 ### Events
 - Public events calendar with filtering by type (tournament, league, clinic, social)
 - Online registration with party size selection
@@ -37,11 +74,23 @@ An online booking and membership portal for [Swan Lake Country Club](https://www
 - Tee time booking requires an active session
 - Persistent "← Back to swanlakecc.com" link keeps users oriented
 
+### Tee Sheet (Admin)
+- Visual day-view at `/admin/tee-sheet` showing all 55 tee time slots (07:00–17:48, 12-minute intervals)
+- Color-coded by status: open (gray), booked (green), checked-in (teal), multi-slot group (purple), cancelled (red)
+- Multi-slot group bookings are visually connected — followers labeled as continuations
+- Click any booked slot to open a detail panel: name, contact, players, holes, equipment, notes
+- Check-in and cancellation directly from the panel — group cancellations cancel all slots atomically
+- Date navigation (prev/next day, date picker, Today button)
+
 ### Admin Dashboard
 - Protected route — only emails in the `admin_users` database table can access `/admin`
-- Manage tee time reservations (view, cancel — cancels the entire group booking)
-- Manage memberships and payment status
+- **Tee Sheet** — visual day view with check-in and cancellation
+- **Bookings** — tabular list of all tee time reservations, filter by date
+- Manage memberships and payment status; issue NFC member cards
+- **Billing** — bulk renewal processing and reminder sending
+- **Tournaments** — create, manage entries, run draws, assign tee times, enter scores
 - Manage events and registrations
+- Manage equipment inventory with full detail fields
 - Unauthenticated users are redirected to the login page; authenticated non-admins are redirected home
 
 ### Settings & Configuration
@@ -52,7 +101,7 @@ An online booking and membership portal for [Swan Lake Country Club](https://www
   - Green fees and cart rental fee
   - Contact phone and email
   - Season start and end dates
-- **Initial admin** — `INITIAL_ADMIN_EMAIL` in `.env.local` seeds the first admin on a fresh database and always retains access as a recovery mechanism, even if removed from the admin table
+- **Default admin** — a fresh database is automatically seeded with `admin@swanlakecc.com` / `admin`; log in, add your own email as an admin, then remove the default account
 
 ### Site Integration
 - Matches [swanlakecc.com](https://www.swanlakecc.com) typography: **Roboto Condensed** (headings) + **Merriweather** (body)
@@ -95,16 +144,14 @@ npm install
 cp .env.local.example .env.local
 ```
 
-Open `.env.local` and fill in the values. At minimum, to run locally you need:
+Only two variables are required to run the app:
 
 ```
 AUTH_SECRET=<any random string for local dev>
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3000
 ```
 
-Everything else (Square, QuickBooks, Google OAuth, Apple Sign In) can be left as placeholders during local development — those features will show configuration errors instead of crashing.
-
-See the [Environment Variables](#environment-variables) section below for the full reference.
+All other settings — SMTP, Square, QuickBooks, Google OAuth, Apple Sign In — are configured through **Admin → Settings** and stored in the database. No rebuild is required when credentials change.
 
 ### 3. Initialize the database
 
@@ -128,72 +175,29 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Environment Variables
 
-All variables live in `.env.local`. Variables prefixed `NEXT_PUBLIC_` are sent to the browser.
-
-### Auth.js
+Almost all configuration is stored in the database and edited through **Admin → Settings** — no rebuild required when credentials change. Only two variables must be in `.env.local`:
 
 | Variable | Description |
 |----------|-------------|
 | `AUTH_SECRET` | Random secret for signing session tokens. Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
+| `NEXTAUTH_URL` | Full URL of the app (e.g. `https://book.swanlakecc.com`). Used by NextAuth for callback URLs and by email links. |
 
-### Google OAuth
+Everything else is managed in the UI:
 
-Create credentials at [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth 2.0 Client IDs → Web application.
+| Setting | Admin → Settings section |
+|---------|--------------------------|
+| SMTP host, port, credentials, from address | Email (SMTP) |
+| Square access token, app ID, location ID, environment | Square Payments |
+| QuickBooks client ID/secret, redirect URI, environment | QuickBooks Payments |
+| Google OAuth client ID and secret | Google Sign In |
+| Apple Sign In client ID and secret | Apple Sign In |
+| Cron secret for billing auto-renewal | Security |
+| Course open/closed, green fees, booking window, season dates | Course Operation |
 
-Authorized redirect URI: `https://book.swanlakecc.com/api/auth/callback/google`
+### Notes
 
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLIENT_ID` | OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-
-### Apple Sign In
-
-Create a Services ID at [Apple Developer](https://developer.apple.com/account/resources/identifiers/list/serviceId) with Sign In with Apple enabled.
-
-Return URL: `https://book.swanlakecc.com/api/auth/callback/apple`
-
-| Variable | Description |
-|----------|-------------|
-| `APPLE_ID` | Services ID (e.g. `com.swanlakecc.book`) |
-| `APPLE_SECRET` | Full contents of the `.p8` private key file |
-
-### Square
-
-Get credentials from [Square Developer Dashboard](https://developer.squareup.com/apps).
-
-| Variable | Description |
-|----------|-------------|
-| `SQUARE_ACCESS_TOKEN` | Server-side access token |
-| `SQUARE_APPLICATION_ID` | App ID (also set as `NEXT_PUBLIC_SQUARE_APPLICATION_ID`) |
-| `SQUARE_LOCATION_ID` | Location ID (also set as `NEXT_PUBLIC_SQUARE_LOCATION_ID`) |
-| `SQUARE_ENVIRONMENT` | `sandbox` or `production` (also set as `NEXT_PUBLIC_SQUARE_ENVIRONMENT`) |
-| `NEXT_PUBLIC_SQUARE_APPLICATION_ID` | Same as `SQUARE_APPLICATION_ID` — used by Google Pay / Apple Pay in the browser |
-| `NEXT_PUBLIC_SQUARE_LOCATION_ID` | Same as `SQUARE_LOCATION_ID` |
-| `NEXT_PUBLIC_SQUARE_ENVIRONMENT` | Same as `SQUARE_ENVIRONMENT` |
-
-### QuickBooks
-
-Get credentials from [Intuit Developer](https://developer.intuit.com).
-
-| Variable | Description |
-|----------|-------------|
-| `QUICKBOOKS_CLIENT_ID` | OAuth client ID |
-| `QUICKBOOKS_CLIENT_SECRET` | OAuth client secret |
-| `QUICKBOOKS_REDIRECT_URI` | `https://book.swanlakecc.com/api/payments/quickbooks/callback` |
-| `QUICKBOOKS_ENVIRONMENT` | `sandbox` or `production` |
-
-### Admin Access
-
-| Variable | Description |
-|----------|-------------|
-| `INITIAL_ADMIN_EMAIL` | Email address of the first admin. Seeded into the `admin_users` table on first run. Always grants admin access as a recovery fallback — use `/admin/settings` to manage all other admins after initial setup. |
-
-### App
-
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SITE_URL` | Full URL of the app (e.g. `https://book.swanlakecc.com`) |
+- OAuth credential changes (Google, Apple) require a server restart to take effect, because NextAuth reads them at startup.
+- The `cron_secret` value set in Settings is used by `POST /api/admin/billing/renew?secret=…` for unattended cron job renewal processing.
 
 ---
 

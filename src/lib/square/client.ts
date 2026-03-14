@@ -1,24 +1,21 @@
 import { Client, Environment } from "square";
+import { getConfigValue } from "@/lib/admin";
 
-let squareClient: Client | null = null;
-
+// No singleton — always read credentials fresh from DB so config changes
+// take effect without a server restart.
 export function getSquareClient(): Client {
-  if (!squareClient) {
-    squareClient = new Client({
-      accessToken: process.env.SQUARE_ACCESS_TOKEN,
-      environment:
-        process.env.SQUARE_ENVIRONMENT === "production"
-          ? Environment.Production
-          : Environment.Sandbox,
-    });
-  }
-  return squareClient;
+  const token = getConfigValue("square_access_token") ?? "";
+  const env = getConfigValue("square_environment");
+  return new Client({
+    accessToken: token,
+    environment: env === "production" ? Environment.Production : Environment.Sandbox,
+  });
 }
 
 export function getSquareAppId(): string {
-  return process.env.SQUARE_APPLICATION_ID || "";
+  return getConfigValue("square_application_id") ?? "";
 }
 
 export function getSquareLocationId(): string {
-  return process.env.SQUARE_LOCATION_ID || "";
+  return getConfigValue("square_location_id") ?? "";
 }

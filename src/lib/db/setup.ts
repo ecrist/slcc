@@ -77,24 +77,131 @@ for (const evt of sampleEvents) {
 }
 
 // Sample equipment inventory
-const equipStmt = db.prepare("INSERT INTO equipment (type, identifier) VALUES (?, ?)");
-const sampleEquipment = [
-  { type: "cart",  identifier: "Cart #1" },
-  { type: "cart",  identifier: "Cart #2" },
-  { type: "cart",  identifier: "Cart #3" },
-  { type: "cart",  identifier: "Cart #4" },
-  { type: "cart",  identifier: "Cart #5" },
-  { type: "cart",  identifier: "Cart #6" },
-  { type: "buggy", identifier: "Buggy A" },
-  { type: "buggy", identifier: "Buggy B" },
-  { type: "buggy", identifier: "Buggy C" },
-  { type: "buggy", identifier: "Buggy D" },
-  { type: "clubs", identifier: "Men's Set 1" },
-  { type: "clubs", identifier: "Men's Set 2" },
-  { type: "clubs", identifier: "Ladies' Set 1" },
+const equipStmt = db.prepare(`
+  INSERT INTO equipment
+    (type, identifier, make, model, year, serial_number, color, seats, fuel_type, battery_year, hours_reading, last_service_date)
+  VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+interface EquipmentSeed {
+  type: string;
+  identifier: string;
+  make?: string;
+  model?: string;
+  year?: number;
+  serial_number?: string;
+  color?: string;
+  seats?: number;
+  fuel_type?: string;
+  battery_year?: number;
+  hours_reading?: number;
+  last_service_date?: string;
+}
+
+const sampleEquipment: EquipmentSeed[] = [
+  // Golf carts
+  {
+    type: "cart", identifier: "Cart #1",
+    make: "Club Car", model: "Precedent i2", year: 2021,
+    serial_number: "PH2107-123456", color: "White",
+    seats: 2, fuel_type: "electric", battery_year: 2021,
+    hours_reading: 842, last_service_date: "2025-10-15",
+  },
+  {
+    type: "cart", identifier: "Cart #2",
+    make: "Club Car", model: "Precedent i2", year: 2021,
+    serial_number: "PH2107-123457", color: "White",
+    seats: 2, fuel_type: "electric", battery_year: 2021,
+    hours_reading: 791, last_service_date: "2025-10-15",
+  },
+  {
+    type: "cart", identifier: "Cart #3",
+    make: "Club Car", model: "Onward 4P", year: 2022,
+    serial_number: "OW2211-654321", color: "Forest Green",
+    seats: 4, fuel_type: "electric", battery_year: 2022,
+    hours_reading: 603, last_service_date: "2025-09-28",
+  },
+  {
+    type: "cart", identifier: "Cart #4",
+    make: "E-Z-GO", model: "RXV Elite", year: 2020,
+    serial_number: "EZGO-2020-88741", color: "White",
+    seats: 2, fuel_type: "electric", battery_year: 2023,
+    hours_reading: 1124, last_service_date: "2025-10-20",
+  },
+  {
+    type: "cart", identifier: "Cart #5",
+    make: "Yamaha", model: "Drive2 PTV", year: 2019,
+    serial_number: "JW9-100001-YM", color: "White",
+    seats: 2, fuel_type: "gas",
+    hours_reading: 1389, last_service_date: "2025-10-05",
+  },
+  {
+    type: "cart", identifier: "Cart #6",
+    make: "Yamaha", model: "Drive2 PTV", year: 2018,
+    serial_number: "JW9-099812-YM", color: "Sand Beige",
+    seats: 2, fuel_type: "gas",
+    hours_reading: 1672, last_service_date: "2025-08-30",
+  },
+  // Walking buggies
+  {
+    type: "buggy", identifier: "Buggy A",
+    make: "Clicgear", model: "Model 4.0", year: 2023,
+    serial_number: "CG4-A001", color: "Black",
+    seats: 0, fuel_type: "push",
+    last_service_date: "2025-10-01",
+  },
+  {
+    type: "buggy", identifier: "Buggy B",
+    make: "Clicgear", model: "Model 4.0", year: 2023,
+    serial_number: "CG4-A002", color: "Black",
+    seats: 0, fuel_type: "push",
+    last_service_date: "2025-10-01",
+  },
+  {
+    type: "buggy", identifier: "Buggy C",
+    make: "Sun Mountain", model: "Speed Cart GT", year: 2022,
+    serial_number: "SMGT-C003", color: "Black/Red",
+    seats: 0, fuel_type: "push",
+    last_service_date: "2025-09-15",
+  },
+  {
+    type: "buggy", identifier: "Buggy D",
+    make: "Bag Boy", model: "Triswivel II", year: 2021,
+    serial_number: "BB3-D004", color: "Blue",
+    seats: 0, fuel_type: "push",
+    last_service_date: "2025-09-15",
+  },
+  // Club rentals
+  {
+    type: "clubs", identifier: "Men's Set 1",
+    make: "Callaway", model: "Strata Ultimate 16-Piece", year: 2022,
+    serial_number: "CAL-M001", color: "Black/Silver",
+    last_service_date: "2025-10-01",
+  },
+  {
+    type: "clubs", identifier: "Men's Set 2",
+    make: "Callaway", model: "Strata Ultimate 16-Piece", year: 2022,
+    serial_number: "CAL-M002", color: "Black/Silver",
+    last_service_date: "2025-10-01",
+  },
+  {
+    type: "clubs", identifier: "Ladies' Set 1",
+    make: "Wilson", model: "Profile SGI Complete Set", year: 2021,
+    serial_number: "WIL-L001", color: "Pink/White",
+    last_service_date: "2025-10-01",
+  },
 ];
+
 for (const item of sampleEquipment) {
-  equipStmt.run(item.type, item.identifier);
+  equipStmt.run(
+    item.type, item.identifier,
+    item.make ?? null, item.model ?? null, item.year ?? null,
+    item.serial_number ?? null, item.color ?? null,
+    item.seats ?? null, item.fuel_type ?? null,
+    item.battery_year ?? null, item.hours_reading ?? null,
+    item.last_service_date ?? null,
+  );
 }
 
 console.log("Database seeded successfully!");

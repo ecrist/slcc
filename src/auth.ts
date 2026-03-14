@@ -4,8 +4,20 @@ import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/db";
+import { authConfig } from "@/auth.config";
+
+// Read OAuth credentials from the database at request time so config changes
+// take effect without a server restart.
+function dbCfg(key: string): string {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT value FROM site_config WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? "";
+}
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -27,25 +39,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       },
     }),
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: dbCfg("google_client_id"),
+      clientSecret: dbCfg("google_client_secret"),
     }),
     Apple({
-      clientId: process.env.APPLE_ID!,
-      clientSecret: process.env.APPLE_SECRET!,
+      clientId: dbCfg("apple_id"),
+      clientSecret: dbCfg("apple_secret"),
     }),
   ],
-  pages: {
-    signIn: "/login",
-  },
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) token.id = user.id;
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user && token.id) session.user.id = token.id as string;
-      return session;
-    },
-  },
 });

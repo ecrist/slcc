@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
+import bcrypt from "bcryptjs";
 
 const DB_PATH = path.join(process.cwd(), "swan-lake.db");
 
@@ -136,6 +137,56 @@ function initializeDatabase(db: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS tournaments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      tournament_date TEXT NOT NULL,
+      registration_deadline TEXT,
+      format TEXT NOT NULL DEFAULT 'luck_of_the_draw',
+      team_size INTEGER NOT NULL DEFAULT 2,
+      max_entries INTEGER,
+      entry_fee REAL NOT NULL DEFAULT 0,
+      holes INTEGER NOT NULL DEFAULT 18,
+      status TEXT NOT NULL DEFAULT 'registration_open',
+      results_notes TEXT,
+      is_public INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tournament_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id INTEGER NOT NULL,
+      player_name TEXT NOT NULL,
+      player_email TEXT,
+      player_phone TEXT,
+      handicap REAL,
+      team_id INTEGER,
+      flight TEXT,
+      notes TEXT,
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      payment_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS tournament_teams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id INTEGER NOT NULL,
+      team_name TEXT NOT NULL,
+      flight TEXT,
+      tee_time TEXT,
+      tee_hole INTEGER DEFAULT 1,
+      gross_score INTEGER,
+      net_score REAL,
+      place INTEGER,
+      FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tournaments_date ON tournaments(tournament_date);
+    CREATE INDEX IF NOT EXISTS idx_tournament_entries_tournament ON tournament_entries(tournament_id);
+    CREATE INDEX IF NOT EXISTS idx_tournament_teams_tournament ON tournament_teams(tournament_id);
+
     CREATE INDEX IF NOT EXISTS idx_tee_times_date ON tee_times(date);
     CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
     CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(status);
@@ -158,6 +209,19 @@ function initializeDatabase(db: Database.Database) {
     "ALTER TABLE tee_times ADD COLUMN checked_in INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE tee_times ADD COLUMN checked_in_at TEXT",
     "ALTER TABLE memberships ADD COLUMN nfc_token TEXT",
+    "ALTER TABLE equipment ADD COLUMN make TEXT",
+    "ALTER TABLE equipment ADD COLUMN model TEXT",
+    "ALTER TABLE equipment ADD COLUMN year INTEGER",
+    "ALTER TABLE equipment ADD COLUMN serial_number TEXT",
+    "ALTER TABLE equipment ADD COLUMN color TEXT",
+    "ALTER TABLE equipment ADD COLUMN seats INTEGER",
+    "ALTER TABLE equipment ADD COLUMN fuel_type TEXT",
+    "ALTER TABLE equipment ADD COLUMN battery_year INTEGER",
+    "ALTER TABLE equipment ADD COLUMN hours_reading REAL",
+    "ALTER TABLE equipment ADD COLUMN last_service_date TEXT",
+    "ALTER TABLE memberships ADD COLUMN auto_renew INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE memberships ADD COLUMN square_customer_id TEXT",
+    "ALTER TABLE memberships ADD COLUMN square_card_id TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -168,25 +232,56 @@ function initializeDatabase(db: Database.Database) {
     "INSERT OR IGNORE INTO site_config (key, value, label, description) VALUES (?, ?, ?, ?)"
   );
   const defaults: [string, string, string, string][] = [
-    ["course_open",          "true",             "Course Open for Booking",      "Allow new tee time bookings to be made online"],
-    ["booking_days_ahead",   "7",                "Booking Window (days)",        "How many days in advance tee times can be booked"],
-    ["green_fee_9_holes",    "25",               "9-Hole Green Fee ($)",         ""],
-    ["green_fee_18_holes",   "35",               "18-Hole Green Fee ($)",        ""],
-    ["cart_fee_per_9",       "10",               "Cart Rental Fee ($ / 9 holes)",""],
-    ["contact_phone",        "(218) 885-3543",   "Contact Phone",                ""],
-    ["contact_email",        "golf@swanlakecc.com", "Contact Email",             ""],
-    ["season_start",         "May 1",            "Season Start",                 ""],
-    ["season_end",              "October 31",       "Season End",                   ""],
-    ["buggy_fee",               "5",                "Walking Buggy Fee ($)",        "Fee to rent a push/pull buggy for a round"],
-    ["clubs_fee",               "15",               "Club Rental Fee ($)",          "Fee to rent a set of clubs for a round"],
-    ["personal_cart_drop_fee",  "15",               "Personal Cart Drop Fee ($)",   "Daily fee for a guest to bring their own golf cart onto the course"],
+    // Course operation
+    ["course_open",             "true",                    "Course Open for Booking",        "Allow new tee time bookings to be made online"],
+    ["booking_days_ahead",      "7",                       "Booking Window (days)",          "How many days in advance tee times can be booked"],
+    ["green_fee_9_holes",       "25",                      "9-Hole Green Fee ($)",           ""],
+    ["green_fee_18_holes",      "35",                      "18-Hole Green Fee ($)",          ""],
+    ["cart_fee_per_9",          "10",                      "Cart Rental Fee ($ / 9 holes)",  ""],
+    ["buggy_fee",               "5",                       "Walking Buggy Fee ($)",          "Fee to rent a push/pull buggy for a round"],
+    ["clubs_fee",               "15",                      "Club Rental Fee ($)",            "Fee to rent a set of clubs for a round"],
+    ["personal_cart_drop_fee",  "15",                      "Personal Cart Drop Fee ($)",     "Daily fee for a guest to bring their own golf cart onto the course"],
+    ["contact_phone",           "(218) 885-3543",          "Contact Phone",                  ""],
+    ["contact_email",           "golf@swanlakecc.com",     "Contact Email",                  ""],
+    ["season_start",            "May 1",                   "Season Start",                   ""],
+    ["season_end",              "October 31",              "Season End",                     ""],
+    // Email (SMTP)
+    ["smtp_host",               "",   "SMTP Host",               "e.g. smtp.sendgrid.net or mail.swanlakecc.com"],
+    ["smtp_port",               "587","SMTP Port",               "587 for STARTTLS, 465 for implicit TLS"],
+    ["smtp_secure",             "",   "SMTP Secure (TLS)",       "Set to 'true' for port 465; leave empty for STARTTLS"],
+    ["smtp_user",               "",   "SMTP Username",           ""],
+    ["smtp_pass",               "",   "SMTP Password",           ""],
+    ["smtp_from",               "Swan Lake Country Club <noreply@swanlakecc.com>", "From Address", ""],
+    // Square Payments
+    ["square_access_token",     "",           "Square Access Token",      "Server-side token from Square Developer Dashboard"],
+    ["square_application_id",   "",           "Square Application ID",    "Also used client-side for Google Pay / Apple Pay"],
+    ["square_location_id",      "",           "Square Location ID",       ""],
+    ["square_environment",      "sandbox",    "Square Environment",       "sandbox or production"],
+    // QuickBooks
+    ["quickbooks_client_id",      "",                                               "QuickBooks Client ID",       ""],
+    ["quickbooks_client_secret",  "",                                               "QuickBooks Client Secret",   ""],
+    ["quickbooks_redirect_uri",   "https://book.swanlakecc.com/api/payments/quickbooks/callback", "QuickBooks Redirect URI", ""],
+    ["quickbooks_environment",    "sandbox",                                        "QuickBooks Environment",     "sandbox or production"],
+    // Google OAuth
+    ["google_client_id",        "", "Google Client ID",     "From Google Cloud Console → OAuth 2.0 Client IDs"],
+    ["google_client_secret",    "", "Google Client Secret", ""],
+    // Apple Sign In
+    ["apple_id",                "", "Apple Services ID",    "e.g. com.swanlakecc.book"],
+    ["apple_secret",            "", "Apple Private Key",    "Full contents of your .p8 private key file"],
+    // Security
+    ["cron_secret",             "", "Cron Secret",          "Shared secret for POST /api/admin/billing/renew?secret=… — use a long random string"],
   ];
   for (const row of defaults) seedConfig.run(...row);
 
-  // Seed the initial admin from INITIAL_ADMIN_EMAIL if no admins exist yet.
-  const adminCount = (db.prepare("SELECT COUNT(*) as n FROM admin_users").get() as { n: number }).n;
-  const initialAdmin = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
-  if (adminCount === 0 && initialAdmin) {
-    db.prepare("INSERT OR IGNORE INTO admin_users (email, added_by) VALUES (?, 'system')").run(initialAdmin);
+  // Seed a default admin user account if no users exist yet.
+  // Default credentials: admin@swanlakecc.com / admin
+  // Change the password immediately after first login via /admin/settings.
+  const userCount = (db.prepare("SELECT COUNT(*) as n FROM users").get() as { n: number }).n;
+  if (userCount === 0) {
+    const passwordHash = bcrypt.hashSync("admin", 12);
+    db.prepare("INSERT OR IGNORE INTO users (email, name, password_hash) VALUES (?, ?, ?)")
+      .run("admin@swanlakecc.com", "Admin", passwordHash);
+    db.prepare("INSERT OR IGNORE INTO admin_users (email, added_by) VALUES (?, 'system')")
+      .run("admin@swanlakecc.com");
   }
 }

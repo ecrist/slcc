@@ -22,11 +22,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin" className="text-swan-gold font-medium hover:text-swan-gold-light whitespace-nowrap">
               Dashboard
             </Link>
+            <Link href="/admin/tee-sheet" className="text-gray-300 hover:text-white whitespace-nowrap">
+              Tee Sheet
+            </Link>
             <Link href="/admin/tee-times" className="text-gray-300 hover:text-white whitespace-nowrap">
-              Tee Times
+              Bookings
             </Link>
             <Link href="/admin/memberships" className="text-gray-300 hover:text-white whitespace-nowrap">
               Memberships
+            </Link>
+            <Link href="/admin/billing" className="text-gray-300 hover:text-white whitespace-nowrap">
+              Billing
+            </Link>
+            <Link href="/admin/tournaments" className="text-gray-300 hover:text-white whitespace-nowrap">
+              Tournaments
             </Link>
             <Link href="/admin/events" className="text-gray-300 hover:text-white whitespace-nowrap">
               Events

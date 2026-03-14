@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { getConfigValue } from "@/lib/admin";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
+import { sendTeeTimeConfirmation } from "@/lib/email";
 
 function getEquipmentAvailability(db: ReturnType<typeof getDb>, date: string) {
   const cartFeePerNine = parseFloat(getConfigValue("cart_fee_per_9") ?? "10");
@@ -161,6 +162,25 @@ export async function POST(request: NextRequest) {
 
   try {
     const ids = checkAndInsert.immediate();
+
+    // Send confirmation email (non-blocking)
+    if (player_email) {
+      sendTeeTimeConfirmation({
+        to: player_email,
+        player_name,
+        date,
+        time,
+        players: playerCount,
+        holes: holes || 18,
+        slots: timesToBook,
+        carts: cartsWanted,
+        buggies: buggiesWanted,
+        clubs: clubsWanted,
+        personal_cart_drop: personalCartDrop === 1,
+        group_booking_id: groupId,
+      }).catch(() => {});
+    }
+
     return NextResponse.json(
       {
         id: ids[0],

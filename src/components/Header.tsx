@@ -66,6 +66,9 @@ export default function Header() {
             <Link href="/events" className="text-white hover:text-swan-gold transition-colors font-medium">
               Events
             </Link>
+            <Link href="/tournaments" className="text-white hover:text-swan-gold transition-colors font-medium">
+              Tournaments
+            </Link>
             {session ? (
               <div className="flex items-center gap-3">
                 {avatar && (
@@ -120,6 +123,9 @@ export default function Header() {
             </Link>
             <Link href="/events" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
               Events
+            </Link>
+            <Link href="/tournaments" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
+              Tournaments
             </Link>
             {session ? (
               <>

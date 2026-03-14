@@ -70,6 +70,84 @@ export interface EventRegistration {
   created_at: string;
 }
 
+export interface Tournament {
+  id: number;
+  title: string;
+  description: string | null;
+  tournament_date: string;
+  registration_deadline: string | null;
+  format: TournamentFormat;
+  team_size: number;
+  max_entries: number | null;
+  entry_fee: number;
+  holes: number;
+  status: TournamentStatus;
+  results_notes: string | null;
+  is_public: number;
+  created_at: string;
+}
+
+export interface TournamentEntry {
+  id: number;
+  tournament_id: number;
+  player_name: string;
+  player_email: string | null;
+  player_phone: string | null;
+  handicap: number | null;
+  team_id: number | null;
+  flight: string | null;
+  notes: string | null;
+  payment_status: string;
+  payment_id: string | null;
+  created_at: string;
+}
+
+export interface TournamentTeam {
+  id: number;
+  tournament_id: number;
+  team_name: string;
+  flight: string | null;
+  tee_time: string | null;
+  tee_hole: number;
+  gross_score: number | null;
+  net_score: number | null;
+  place: number | null;
+}
+
+export type TournamentFormat =
+  | "luck_of_the_draw"
+  | "stroke_play"
+  | "stableford"
+  | "scramble"
+  | "best_ball"
+  | "match_play";
+
+export type TournamentStatus =
+  | "registration_open"
+  | "registration_closed"
+  | "draw_complete"
+  | "scoring"
+  | "completed"
+  | "cancelled";
+
+export const TOURNAMENT_FORMAT_LABELS: Record<TournamentFormat, string> = {
+  luck_of_the_draw: "Luck of the Draw",
+  stroke_play: "Stroke Play",
+  stableford: "Stableford",
+  scramble: "Scramble",
+  best_ball: "Best Ball",
+  match_play: "Match Play",
+};
+
+export const TOURNAMENT_STATUS_LABELS: Record<TournamentStatus, string> = {
+  registration_open: "Registration Open",
+  registration_closed: "Registration Closed",
+  draw_complete: "Draw Complete",
+  scoring: "In Progress",
+  completed: "Results Posted",
+  cancelled: "Cancelled",
+};
+
 export const MEMBERSHIP_TYPES = {
   junior_summer_pass: { name: "Junior Summer Pass", price: 100, description: "Age 18 and under. Unlimited play all season." },
   young_adult: { name: "Young Adult", price: 445, description: "Ages 19–29. Unlimited play all season." },

@@ -34,16 +34,27 @@ export default function SquareWalletButtons({ price, label, onToken, onError }: 
   const [googlePayReady, setGooglePayReady] = useState(false);
   const [applePayReady, setApplePayReady] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [appId, setAppId] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [isSandbox, setIsSandbox] = useState(true);
   const googlePayRef = useRef<SquarePaymentMethod | null>(null);
   const applePayRef = useRef<SquarePaymentMethod | null>(null);
 
-  const appId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID || "";
-  const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "";
-  const isSandbox = process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT !== "production";
+  // Fetch Square public config from server (not baked-in env vars)
+  useEffect(() => {
+    fetch("/api/config/public")
+      .then((r) => r.json())
+      .then((cfg) => {
+        setAppId(cfg.square_application_id ?? "");
+        setLocationId(cfg.square_location_id ?? "");
+        setIsSandbox(cfg.square_environment !== "production");
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!appId || !locationId) {
-      setLoading(false);
+      if (appId !== undefined) setLoading(false); // config fetched but empty
       return;
     }
 

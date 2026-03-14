@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { sendMembershipReceipt } from "@/lib/email";
+import { MEMBERSHIP_TYPES, type MembershipType } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
 // Process a Square Web Payments SDK token (Google Pay / Apple Pay / Card)
@@ -16,31 +18,61 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const {
-    token,
-    membership_type,
-    amount,
-    first_name,
-    last_name,
-    email,
-    phone,
-    address,
-    city,
-    state,
-    zip,
+    token, membership_type, amount,
+    first_name, last_name, email,
+    phone, address, city, state, zip,
+    save_card,
   } = body;
 
   if (!token || !membership_type || !amount || !first_name || !last_name || !email) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  const tier = MEMBERSHIP_TYPES[membership_type as MembershipType];
+  if (!tier) return NextResponse.json({ error: "Invalid membership type" }, { status: 400 });
+
   try {
     const { getSquareClient, getSquareLocationId } = await import("@/lib/square/client");
     const client = getSquareClient();
 
+    let squareCustomerId: string | null = null;
+    let squareCardId: string | null = null;
+    let sourceId = token;
+
+    // If save_card requested, create a Customer + Card on File first, then charge the card
+    if (save_card) {
+      try {
+        const custResult = await client.customersApi.createCustomer({
+          idempotencyKey: uuidv4(),
+          givenName: first_name,
+          familyName: last_name,
+          emailAddress: email,
+          phoneNumber: phone || undefined,
+        });
+        squareCustomerId = custResult.result.customer?.id ?? null;
+
+        if (squareCustomerId) {
+          const cardResult = await client.cardsApi.createCard({
+            idempotencyKey: uuidv4(),
+            sourceId: token,
+            card: { customerId: squareCustomerId },
+          });
+          squareCardId = cardResult.result.card?.id ?? null;
+          if (squareCardId) sourceId = squareCardId;
+        }
+      } catch {
+        // Card-on-file creation failed — fall back to single-use nonce
+        squareCustomerId = null;
+        squareCardId = null;
+        sourceId = token;
+      }
+    }
+
     const idempotencyKey = uuidv4();
     const response = await client.paymentsApi.createPayment({
-      sourceId: token,
+      sourceId,
       idempotencyKey,
+      customerId: squareCustomerId ?? undefined,
       amountMoney: {
         amount: BigInt(Math.round(amount * 100)),
         currency: "USD",
@@ -54,43 +86,44 @@ export async function POST(request: NextRequest) {
     }
 
     const paymentId = response.result.payment.id;
-
-    // Create membership record
     const db = getDb();
-    const memberNumber = `SL${Date.now()}`;
+    const memberNumber = `SLCC-${new Date().getFullYear()}-${uuidv4().slice(0, 6).toUpperCase()}`;
     const today = new Date().toISOString().split("T")[0];
 
     const result = db
       .prepare(
         `INSERT INTO memberships
-         (member_number, first_name, last_name, email, phone, address, city, state, zip,
-          membership_type, start_date, end_date, amount_paid, payment_id, payment_provider, payment_status, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (member_number, first_name, last_name, email, phone, address, city, state, zip,
+            membership_type, start_date, end_date, amount_paid, payment_id, payment_provider,
+            payment_status, status, auto_renew, square_customer_id, square_card_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        memberNumber,
-        first_name,
-        last_name,
-        email,
-        phone || null,
-        address || null,
-        city || null,
-        state || "MN",
-        zip || null,
-        membership_type,
-        today,
-        "2026-10-31",
-        amount,
-        paymentId,
-        "square_wallet",
-        "paid",
-        "active"
+        memberNumber, first_name, last_name, email,
+        phone || null, address || null, city || null, state || "MN", zip || null,
+        membership_type, today, "2026-10-31",
+        amount, paymentId, "square_wallet", "paid", "active",
+        save_card && squareCardId ? 1 : 0,
+        squareCustomerId, squareCardId,
       );
+
+    // Send receipt email (non-blocking)
+    sendMembershipReceipt({
+      to: email,
+      first_name,
+      last_name,
+      member_number: memberNumber,
+      membership_type: tier.name,
+      amount,
+      payment_provider: save_card && squareCardId ? "Square (card saved for auto-renewal)" : "Square",
+      season_end: "October 31, 2026",
+    }).catch(() => {});
 
     return NextResponse.json({
       member_number: memberNumber,
       membership_id: result.lastInsertRowid,
       payment_id: paymentId,
+      auto_renew_enabled: !!(save_card && squareCardId),
     });
   } catch (error) {
     console.error("Square wallet payment error:", error);

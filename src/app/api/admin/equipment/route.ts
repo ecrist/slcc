@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
   const { deny } = await requireAdmin();
   if (deny) return deny;
 
-  const { type, identifier } = await request.json();
+  const body = await request.json();
+  const { type, identifier } = body;
   if (!type || !identifier) {
     return NextResponse.json({ error: "type and identifier are required" }, { status: 400 });
   }
@@ -38,8 +39,17 @@ export async function POST(request: NextRequest) {
 
   const db = getDb();
   const result = db
-    .prepare("INSERT INTO equipment (type, identifier) VALUES (?, ?)")
-    .run(type, identifier.trim());
+    .prepare(`INSERT INTO equipment
+      (type, identifier, make, model, year, serial_number, color, seats, fuel_type, battery_year, hours_reading, last_service_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(
+      type, identifier.trim(),
+      body.make ?? null, body.model ?? null, body.year ?? null,
+      body.serial_number ?? null, body.color ?? null,
+      body.seats ?? null, body.fuel_type ?? null,
+      body.battery_year ?? null, body.hours_reading ?? null,
+      body.last_service_date ?? null,
+    );
 
   return NextResponse.json({ id: result.lastInsertRowid }, { status: 201 });
 }
@@ -51,7 +61,8 @@ export async function PUT(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  const { status, service_notes } = await request.json();
+  const body = await request.json();
+  const { status, service_notes } = body;
   const validStatuses = ["available", "out_of_service", "maintenance"];
   if (status && !validStatuses.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -61,9 +72,31 @@ export async function PUT(request: NextRequest) {
   const existing = db.prepare("SELECT id FROM equipment WHERE id = ?").get(id);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  db.prepare(
-    "UPDATE equipment SET status = COALESCE(?, status), service_notes = ?, updated_at = datetime('now') WHERE id = ?"
-  ).run(status ?? null, service_notes ?? null, id);
+  db.prepare(`
+    UPDATE equipment SET
+      status = COALESCE(?, status),
+      service_notes = ?,
+      make = COALESCE(?, make),
+      model = COALESCE(?, model),
+      year = COALESCE(?, year),
+      serial_number = COALESCE(?, serial_number),
+      color = COALESCE(?, color),
+      seats = COALESCE(?, seats),
+      fuel_type = COALESCE(?, fuel_type),
+      battery_year = COALESCE(?, battery_year),
+      hours_reading = COALESCE(?, hours_reading),
+      last_service_date = COALESCE(?, last_service_date),
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(
+    status ?? null, service_notes ?? null,
+    body.make ?? null, body.model ?? null, body.year ?? null,
+    body.serial_number ?? null, body.color ?? null,
+    body.seats ?? null, body.fuel_type ?? null,
+    body.battery_year ?? null, body.hours_reading ?? null,
+    body.last_service_date ?? null,
+    id,
+  );
 
   return NextResponse.json({ ok: true });
 }

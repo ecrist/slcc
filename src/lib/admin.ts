@@ -13,10 +13,6 @@ import { getDb } from "./db";
  */
 export function isAdminEmail(email: string): boolean {
   const normalised = email.trim().toLowerCase();
-
-  const initial = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
-  if (initial && normalised === initial) return true;
-
   const db = getDb();
   const row = db
     .prepare("SELECT id FROM admin_users WHERE lower(email) = ? LIMIT 1")
