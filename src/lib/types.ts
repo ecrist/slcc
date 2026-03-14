@@ -8,8 +8,14 @@ export interface TeeTime {
   player_phone: string | null;
   holes: number;
   cart: number;
+  carts_requested: number;
+  buggies_requested: number;
+  clubs_requested: number;
+  personal_cart_drop: number;
   status: string;
   notes: string | null;
+  group_booking_id: string | null;
+  slot_index: number;
   created_at: string;
 }
 

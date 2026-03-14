@@ -17,6 +17,14 @@ export function getDb(): Database.Database {
 
 function initializeDatabase(db: Database.Database) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS tee_times (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT NOT NULL,
@@ -99,9 +107,20 @@ function initializeDatabase(db: Database.Database) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS equipment (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      identifier TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'available',
+      service_notes TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tee_times_date ON tee_times(date);
     CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
     CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(status);
+    CREATE INDEX IF NOT EXISTS idx_equipment_type ON equipment(type);
 
     -- Unique partial index: prevents two active bookings for the same slot at the DB level.
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tee_times_unique_active
@@ -112,6 +131,10 @@ function initializeDatabase(db: Database.Database) {
   const migrations = [
     "ALTER TABLE tee_times ADD COLUMN group_booking_id TEXT",
     "ALTER TABLE tee_times ADD COLUMN slot_index INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tee_times ADD COLUMN carts_requested INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tee_times ADD COLUMN buggies_requested INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tee_times ADD COLUMN clubs_requested INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tee_times ADD COLUMN personal_cart_drop INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -130,7 +153,10 @@ function initializeDatabase(db: Database.Database) {
     ["contact_phone",        "(218) 885-3543",   "Contact Phone",                ""],
     ["contact_email",        "golf@swanlakecc.com", "Contact Email",             ""],
     ["season_start",         "May 1",            "Season Start",                 ""],
-    ["season_end",           "October 31",       "Season End",                   ""],
+    ["season_end",              "October 31",       "Season End",                   ""],
+    ["buggy_fee",               "5",                "Walking Buggy Fee ($)",        "Fee to rent a push/pull buggy for a round"],
+    ["clubs_fee",               "15",               "Club Rental Fee ($)",          "Fee to rent a set of clubs for a round"],
+    ["personal_cart_drop_fee",  "15",               "Personal Cart Drop Fee ($)",   "Daily fee for a guest to bring their own golf cart onto the course"],
   ];
   for (const row of defaults) seedConfig.run(...row);
 

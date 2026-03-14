@@ -10,7 +10,9 @@
     "db:setup": "tsx src/lib/db/setup.ts"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "autoprefixer": "^10.4.27",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.7.0",
     "next": "^15.1.0",
     "next-auth": "^5.0.0-beta.30",

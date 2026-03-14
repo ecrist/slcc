@@ -76,4 +76,25 @@ for (const evt of sampleEvents) {
   eventStmt.run(evt.title, evt.description, evt.event_date, evt.start_time, evt.end_time, evt.event_type, evt.max_participants, evt.cost);
 }
 
+// Sample equipment inventory
+const equipStmt = db.prepare("INSERT INTO equipment (type, identifier) VALUES (?, ?)");
+const sampleEquipment = [
+  { type: "cart",  identifier: "Cart #1" },
+  { type: "cart",  identifier: "Cart #2" },
+  { type: "cart",  identifier: "Cart #3" },
+  { type: "cart",  identifier: "Cart #4" },
+  { type: "cart",  identifier: "Cart #5" },
+  { type: "cart",  identifier: "Cart #6" },
+  { type: "buggy", identifier: "Buggy A" },
+  { type: "buggy", identifier: "Buggy B" },
+  { type: "buggy", identifier: "Buggy C" },
+  { type: "buggy", identifier: "Buggy D" },
+  { type: "clubs", identifier: "Men's Set 1" },
+  { type: "clubs", identifier: "Men's Set 2" },
+  { type: "clubs", identifier: "Ladies' Set 1" },
+];
+for (const item of sampleEquipment) {
+  equipStmt.run(item.type, item.identifier);
+}
+
 console.log("Database seeded successfully!");
