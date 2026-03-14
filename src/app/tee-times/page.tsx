@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 
 interface BookedSlot {
@@ -336,21 +336,6 @@ export default function TeeTimesPage() {
                 </p>
               )}
             </div>
-          ) : !session ? (
-            <div className="card sticky top-24 text-center">
-              <svg className="h-12 w-12 mx-auto mb-3 text-swan-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <h2 className="text-xl font-bold mb-2">Sign in to Book</h2>
-              <p className="text-gray-500 text-sm mb-5">
-                You&apos;ve selected <strong>{formatTime(bookingSlot)}</strong> on {formatDateDisplay(selectedDate)}.
-                Sign in or create an account to confirm.
-              </p>
-              <button onClick={() => signIn()} className="btn-primary w-full mb-3">Sign In</button>
-              <a href="/register" className="block text-center text-sm text-swan-green hover:underline">
-                Don&apos;t have an account? Register
-              </a>
-            </div>
           ) : (
             <div className="card sticky top-24">
               <h2 className="text-xl font-bold mb-1">
@@ -365,6 +350,14 @@ export default function TeeTimesPage() {
                 </p>
               )}
 
+              {/* Soft sign-in nudge for guests — not a gate */}
+              {!session && (
+                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3">
+                  <a href="/login" className="text-swan-green font-medium hover:underline">Sign in</a>
+                  {" "}to pre-fill your details, or continue as a guest below.
+                </p>
+              )}
+
               <form onSubmit={handleBook} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -372,7 +365,7 @@ export default function TeeTimesPage() {
                     type="text"
                     required
                     className="input-field"
-                    value={form.player_name || session.user?.name || ""}
+                    value={form.player_name !== "" ? form.player_name : (session?.user?.name ?? "")}
                     onChange={(e) => setForm({ ...form, player_name: e.target.value })}
                   />
                 </div>
@@ -382,7 +375,7 @@ export default function TeeTimesPage() {
                     type="email"
                     required
                     className="input-field"
-                    value={form.player_email || session.user?.email || ""}
+                    value={form.player_email !== "" ? form.player_email : (session?.user?.email ?? "")}
                     onChange={(e) => setForm({ ...form, player_email: e.target.value })}
                   />
                 </div>
