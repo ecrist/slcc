@@ -84,23 +84,60 @@ function initializeDatabase(db: Database.Database) {
       FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      added_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS site_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      label TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tee_times_date ON tee_times(date);
     CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
     CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(status);
 
     -- Unique partial index: prevents two active bookings for the same slot at the DB level.
-    -- This is a hard safety net against race conditions that slip past application-level checks.
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tee_times_unique_active
       ON tee_times(date, time) WHERE status != 'cancelled';
   `);
 
   // Migrations: add columns introduced after initial schema.
-  // ALTER TABLE ADD COLUMN throws if the column already exists — safe to ignore.
   const migrations = [
     "ALTER TABLE tee_times ADD COLUMN group_booking_id TEXT",
     "ALTER TABLE tee_times ADD COLUMN slot_index INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
+  }
+
+  // Seed default site configuration (INSERT OR IGNORE — never overwrites saved values).
+  const seedConfig = db.prepare(
+    "INSERT OR IGNORE INTO site_config (key, value, label, description) VALUES (?, ?, ?, ?)"
+  );
+  const defaults: [string, string, string, string][] = [
+    ["course_open",          "true",             "Course Open for Booking",      "Allow new tee time bookings to be made online"],
+    ["booking_days_ahead",   "7",                "Booking Window (days)",        "How many days in advance tee times can be booked"],
+    ["green_fee_9_holes",    "25",               "9-Hole Green Fee ($)",         ""],
+    ["green_fee_18_holes",   "35",               "18-Hole Green Fee ($)",        ""],
+    ["cart_fee_per_9",       "10",               "Cart Rental Fee ($ / 9 holes)",""],
+    ["contact_phone",        "(218) 885-3543",   "Contact Phone",                ""],
+    ["contact_email",        "golf@swanlakecc.com", "Contact Email",             ""],
+    ["season_start",         "May 1",            "Season Start",                 ""],
+    ["season_end",           "October 31",       "Season End",                   ""],
+  ];
+  for (const row of defaults) seedConfig.run(...row);
+
+  // Seed the initial admin from INITIAL_ADMIN_EMAIL if no admins exist yet.
+  const adminCount = (db.prepare("SELECT COUNT(*) as n FROM admin_users").get() as { n: number }).n;
+  const initialAdmin = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+  if (adminCount === 0 && initialAdmin) {
+    db.prepare("INSERT OR IGNORE INTO admin_users (email, added_by) VALUES (?, 'system')").run(initialAdmin);
   }
 }

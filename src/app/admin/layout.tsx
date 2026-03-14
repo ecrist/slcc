@@ -1,6 +1,19 @@
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { isAdminEmail } from "@/lib/admin";
 import Link from "next/link";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+
+  if (!session?.user?.email) {
+    redirect("/login?callbackUrl=/admin");
+  }
+
+  if (!isAdminEmail(session.user.email)) {
+    redirect("/?error=unauthorized");
+  }
+
   return (
     <div>
       <div className="bg-swan-dark text-white">
@@ -17,6 +30,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
             <Link href="/admin/events" className="text-gray-300 hover:text-white whitespace-nowrap">
               Events
+            </Link>
+            <Link href="/admin/settings" className="text-gray-300 hover:text-white whitespace-nowrap">
+              Settings
             </Link>
             <div className="flex-1" />
             <Link href="/" className="text-gray-400 hover:text-white whitespace-nowrap">
