@@ -38,11 +38,21 @@ An online booking and membership portal for [Swan Lake Country Club](https://www
 - Persistent "← Back to swanlakecc.com" link keeps users oriented
 
 ### Admin Dashboard
-- Protected route — only email addresses listed in `ADMIN_EMAILS` can access `/admin`
+- Protected route — only emails in the `admin_users` database table can access `/admin`
 - Manage tee time reservations (view, cancel — cancels the entire group booking)
 - Manage memberships and payment status
 - Manage events and registrations
 - Unauthenticated users are redirected to the login page; authenticated non-admins are redirected home
+
+### Settings & Configuration
+- **Admin users** — add and remove admin accounts via `/admin/settings`; changes take effect immediately
+- **Site configuration** — all operational settings are stored in the database and editable through the web UI with no rebuild required:
+  - Course open / closed (pause online bookings instantly)
+  - Booking window (how many days ahead guests can book)
+  - Green fees and cart rental fee
+  - Contact phone and email
+  - Season start and end dates
+- **Initial admin** — `INITIAL_ADMIN_EMAIL` in `.env.local` seeds the first admin on a fresh database and always retains access as a recovery mechanism, even if removed from the admin table
 
 ### Site Integration
 - Matches [swanlakecc.com](https://www.swanlakecc.com) typography: **Roboto Condensed** (headings) + **Merriweather** (body)
@@ -177,7 +187,7 @@ Get credentials from [Intuit Developer](https://developer.intuit.com).
 
 | Variable | Description |
 |----------|-------------|
-| `ADMIN_EMAILS` | Comma-separated list of email addresses that can access `/admin` (e.g. `alice@example.com,bob@example.com`) |
+| `INITIAL_ADMIN_EMAIL` | Email address of the first admin. Seeded into the `admin_users` table on first run. Always grants admin access as a recovery fallback — use `/admin/settings` to manage all other admins after initial setup. |
 
 ### App
 
@@ -203,17 +213,21 @@ src/
 │   ├── events/
 │   │   └── page.tsx        # Events calendar and registration
 │   ├── admin/
-│   │   ├── layout.tsx      # Admin sub-nav
+│   │   ├── layout.tsx      # Server component — enforces auth + DB admin check
 │   │   ├── page.tsx        # Dashboard with live stats
 │   │   ├── tee-times/      # Manage reservations
 │   │   ├── memberships/    # Manage memberships
-│   │   └── events/         # Manage events
+│   │   ├── events/         # Manage events
+│   │   └── settings/       # Manage admin users and site configuration
 │   └── api/
 │       ├── auth/[...nextauth]/route.ts   # NextAuth handler
 │       ├── tee-times/route.ts            # GET/POST/DELETE tee times
 │       ├── memberships/route.ts          # GET/POST memberships
 │       ├── events/route.ts               # GET events
 │       ├── events/[id]/register/route.ts # POST event registration
+│       ├── admin/
+│       │   ├── settings/route.ts         # GET/PUT site_config entries
+│       │   └── users/route.ts            # GET/POST/DELETE admin_users
 │       └── payments/
 │           ├── square/route.ts           # Square hosted checkout link
 │           ├── square/process/route.ts   # Square Web Payments SDK token processing
@@ -224,14 +238,15 @@ src/
 │   ├── SessionProvider.tsx  # NextAuth SessionProvider wrapper
 │   └── SquareWalletButtons.tsx  # Google Pay / Apple Pay buttons
 ├── lib/
+│   ├── admin.ts             # isAdminEmail(), admin user & site config helpers
 │   ├── db/
-│   │   ├── index.ts         # SQLite connection, schema, migrations
+│   │   ├── index.ts         # SQLite connection, schema, migrations, config seeding
 │   │   └── setup.ts         # Seed script (npm run db:setup)
 │   ├── square/
 │   │   └── client.ts        # Square API client singleton
 │   └── types.ts             # Shared types, MEMBERSHIP_TYPES, TEE_TIME_SLOTS
 ├── auth.ts                  # NextAuth config (Google + Apple providers)
-└── middleware.ts            # Protects /admin — checks auth + ADMIN_EMAILS
+└── middleware.ts            # Redirects unauthenticated users away from /admin
 ```
 
 ---
