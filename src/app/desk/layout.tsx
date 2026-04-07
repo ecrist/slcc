@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 export default async function DeskLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login?callbackUrl=/desk");
-  if (!isAdminEmail(session.user.email)) redirect("/");
+  if (!(await isAdminEmail(session.user.email))) redirect("/");
 
   return (
     // Fixed overlay — covers the root layout header/footer for a full-screen kiosk feel

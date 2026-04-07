@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/login?callbackUrl=/admin");
   }
 
-  if (!isAdminEmail(session.user.email)) {
+  if (!(await isAdminEmail(session.user.email))) {
     redirect("/?error=unauthorized");
   }
 
