@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     holes, notes, carts_requested, buggies_requested, clubs_requested, personal_cart_drop,
   } = body;
 
-  if (!date || !time || !player_name || !player_email) {
+  if (!date || !time || !player_name) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 

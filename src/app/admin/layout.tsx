@@ -25,10 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/tee-sheet" className="text-gray-300 hover:text-white whitespace-nowrap">
               Tee Sheet
             </Link>
-            <Link href="/admin/tee-times" className="text-gray-300 hover:text-white whitespace-nowrap">
-              Bookings
-            </Link>
-            <Link href="/admin/memberships" className="text-gray-300 hover:text-white whitespace-nowrap">
+<Link href="/admin/memberships" className="text-gray-300 hover:text-white whitespace-nowrap">
               Memberships
             </Link>
             <Link href="/admin/billing" className="text-gray-300 hover:text-white whitespace-nowrap">

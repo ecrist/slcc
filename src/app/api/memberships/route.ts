@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, execute } from "@/lib/db";
 import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
+import { auth } from "@/auth";
+import { isAdminEmail } from "@/lib/admin";
 
 export async function GET() {
   const memberships = await query("SELECT * FROM memberships ORDER BY created_at DESC");
@@ -57,4 +59,17 @@ export async function POST(request: NextRequest) {
       message: "Membership created. QuickBooks payment integration ready - configure QUICKBOOKS_CLIENT_ID in .env.local to enable online payments.",
     }, { status: 201 });
   }
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const { id, payment_status, status } = await request.json();
+  await execute(
+    "UPDATE memberships SET payment_status=$1, status=$2 WHERE id=$3",
+    [payment_status ?? "paid", status ?? "active", id]
+  );
+  return NextResponse.json({ ok: true });
 }
