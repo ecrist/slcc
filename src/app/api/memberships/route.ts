@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { query, execute } from "@/lib/db";
 import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
 export async function GET() {
-  const db = getDb();
-  const memberships = db.prepare("SELECT * FROM memberships ORDER BY created_at DESC").all();
+  const memberships = await query("SELECT * FROM memberships ORDER BY created_at DESC");
   return NextResponse.json(memberships);
 }
 
@@ -27,35 +26,31 @@ export async function POST(request: NextRequest) {
   const tier = MEMBERSHIP_TYPES[membership_type as MembershipType];
   const memberNumber = `SLCC-${new Date().getFullYear()}-${uuidv4().slice(0, 6).toUpperCase()}`;
 
-  const db = getDb();
-
-  const result = db.prepare(
-    `INSERT INTO memberships (member_number, first_name, last_name, email, phone, address, city, state, zip,
-      membership_type, start_date, end_date, amount_paid, payment_provider, payment_status, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    memberNumber, first_name, last_name, email, phone || null,
-    address || null, city || null, state || "MN", zip || null,
-    membership_type, "2026-05-01", "2026-10-31",
-    tier.price, payment_provider || "square", "pending", "pending"
+  const { id } = await execute(
+    `INSERT INTO memberships
+       (member_number, first_name, last_name, email, phone, address, city, state, zip,
+        membership_type, start_date, end_date, amount_paid, payment_provider, payment_status, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     RETURNING id`,
+    [
+      memberNumber, first_name, last_name, email, phone || null,
+      address || null, city || null, state || "MN", zip || null,
+      membership_type, "2026-05-01", "2026-10-31",
+      tier.price, payment_provider || "square", "pending", "pending",
+    ]
   );
 
-  // In production, you would create a Square checkout or QuickBooks invoice here.
-  // For now, return the membership details with a placeholder payment flow.
   if (payment_provider === "square") {
-    // Square Checkout API would be called here to create a payment link
-    // const { result: checkoutResult } = await squareClient.checkoutApi.createPaymentLink({...});
     return NextResponse.json({
-      id: result.lastInsertRowid,
+      id,
       member_number: memberNumber,
       amount: tier.price,
       payment_provider: "square",
       message: "Membership created. Square payment integration ready - configure SQUARE_ACCESS_TOKEN in .env.local to enable online payments.",
     }, { status: 201 });
   } else {
-    // QuickBooks Payments API would create an invoice here
     return NextResponse.json({
-      id: result.lastInsertRowid,
+      id,
       member_number: memberNumber,
       amount: tier.price,
       payment_provider: "quickbooks",

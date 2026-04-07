@@ -4,7 +4,7 @@ import { isAdminEmail, getAllConfig, setConfigValue } from "@/lib/admin";
 
 async function requireAdmin() {
   const session = await auth();
-  if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return null;
@@ -14,7 +14,7 @@ export async function GET() {
   const deny = await requireAdmin();
   if (deny) return deny;
 
-  return NextResponse.json(getAllConfig());
+  return NextResponse.json(await getAllConfig());
 }
 
 export async function PUT(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest) {
 
   for (const [key, value] of Object.entries(updates)) {
     if (typeof value === "string") {
-      setConfigValue(key, value);
+      await setConfigValue(key, value);
     }
   }
 

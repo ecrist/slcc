@@ -1,20 +1,23 @@
 import nodemailer from "nodemailer";
 import { getConfigValue } from "@/lib/admin";
 
-function getTransporter() {
-  const host = getConfigValue("smtp_host");
+async function getTransporter() {
+  const host = await getConfigValue("smtp_host");
   if (!host) return null;
-  const user = getConfigValue("smtp_user") || undefined;
+  const user = (await getConfigValue("smtp_user")) || undefined;
   return nodemailer.createTransport({
     host,
-    port: parseInt(getConfigValue("smtp_port") ?? "587"),
-    secure: getConfigValue("smtp_secure") === "true",
-    auth: user ? { user, pass: getConfigValue("smtp_pass") ?? "" } : undefined,
+    port: parseInt((await getConfigValue("smtp_port")) ?? "587"),
+    secure: (await getConfigValue("smtp_secure")) === "true",
+    auth: user ? { user, pass: (await getConfigValue("smtp_pass")) ?? "" } : undefined,
   });
 }
 
-function getFrom() {
-  return getConfigValue("smtp_from") ?? "Swan Lake Country Club <noreply@swanlakecc.com>";
+async function getFrom() {
+  return (
+    (await getConfigValue("smtp_from")) ??
+    "Swan Lake Country Club <noreply@swanlakecc.com>"
+  );
 }
 
 function getSiteUrl() {
@@ -22,12 +25,12 @@ function getSiteUrl() {
 }
 
 async function send(to: string, subject: string, html: string) {
-  const t = getTransporter();
+  const t = await getTransporter();
   if (!t) {
     console.warn("[email] smtp_host not configured in site settings — skipping email to", to);
     return;
   }
-  const FROM = getFrom();
+  const FROM = await getFrom();
   try {
     await t.sendMail({ from: FROM, to, subject, html });
   } catch (err) {

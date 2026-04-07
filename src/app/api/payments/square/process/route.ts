@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { execute } from "@/lib/db";
 import { sendMembershipReceipt } from "@/lib/email";
 import { MEMBERSHIP_TYPES, type MembershipType } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const { getSquareClient, getSquareLocationId } = await import("@/lib/square/client");
-    const client = getSquareClient();
+    const client     = await getSquareClient();
+    const locationId = await getSquareLocationId();
 
     let squareCustomerId: string | null = null;
-    let squareCardId: string | null = null;
+    let squareCardId: string | null     = null;
     let sourceId = token;
 
-    // If save_card requested, create a Customer + Card on File first, then charge the card
     if (save_card) {
       try {
         const custResult = await client.customersApi.createCustomer({
@@ -61,23 +61,21 @@ export async function POST(request: NextRequest) {
           if (squareCardId) sourceId = squareCardId;
         }
       } catch {
-        // Card-on-file creation failed — fall back to single-use nonce
         squareCustomerId = null;
-        squareCardId = null;
-        sourceId = token;
+        squareCardId     = null;
+        sourceId         = token;
       }
     }
 
-    const idempotencyKey = uuidv4();
     const response = await client.paymentsApi.createPayment({
       sourceId,
-      idempotencyKey,
+      idempotencyKey: uuidv4(),
       customerId: squareCustomerId ?? undefined,
       amountMoney: {
         amount: BigInt(Math.round(amount * 100)),
         currency: "USD",
       },
-      locationId: getSquareLocationId(),
+      locationId,
       note: `Swan Lake CC - ${membership_type} membership`,
     });
 
@@ -85,29 +83,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payment failed" }, { status: 400 });
     }
 
-    const paymentId = response.result.payment.id;
-    const db = getDb();
+    const paymentId    = response.result.payment.id;
     const memberNumber = `SLCC-${new Date().getFullYear()}-${uuidv4().slice(0, 6).toUpperCase()}`;
-    const today = new Date().toISOString().split("T")[0];
+    const today        = new Date().toISOString().split("T")[0];
 
-    const result = db
-      .prepare(
-        `INSERT INTO memberships
-           (member_number, first_name, last_name, email, phone, address, city, state, zip,
-            membership_type, start_date, end_date, amount_paid, payment_id, payment_provider,
-            payment_status, status, auto_renew, square_customer_id, square_card_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
+    const { id } = await execute(
+      `INSERT INTO memberships
+         (member_number, first_name, last_name, email, phone, address, city, state, zip,
+          membership_type, start_date, end_date, amount_paid, payment_id, payment_provider,
+          payment_status, status, auto_renew, square_customer_id, square_card_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       RETURNING id`,
+      [
         memberNumber, first_name, last_name, email,
         phone || null, address || null, city || null, state || "MN", zip || null,
         membership_type, today, "2026-10-31",
         amount, paymentId, "square_wallet", "paid", "active",
         save_card && squareCardId ? 1 : 0,
         squareCustomerId, squareCardId,
-      );
+      ]
+    );
 
-    // Send receipt email (non-blocking)
     sendMembershipReceipt({
       to: email,
       first_name,
@@ -121,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       member_number: memberNumber,
-      membership_id: result.lastInsertRowid,
+      membership_id: id,
       payment_id: paymentId,
       auto_renew_enabled: !!(save_card && squareCardId),
     });

@@ -1,23 +1,21 @@
 import Link from "next/link";
-import { getDb } from "@/lib/db";
+import { query } from "@/lib/db";
 import { TOURNAMENT_FORMAT_LABELS, TOURNAMENT_STATUS_LABELS, type Tournament } from "@/lib/types";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function TournamentsPage() {
-  const db = getDb();
-  const tournaments = db
-    .prepare(
-      `SELECT t.*,
-         (SELECT COUNT(*) FROM tournament_entries e WHERE e.tournament_id = t.id) AS entry_count
-       FROM tournaments t
-       WHERE t.is_public = 1
-       ORDER BY t.tournament_date DESC`
-    )
-    .all() as (Tournament & { entry_count: number })[];
+  const tournaments = await query<Tournament & { entry_count: number }>(
+    `SELECT t.*,
+       (SELECT COUNT(*)::int FROM tournament_entries e WHERE e.tournament_id = t.id) AS entry_count
+     FROM tournaments t
+     WHERE t.is_public = 1
+     ORDER BY t.tournament_date DESC`
+  );
 
-  const upcoming = tournaments.filter((t) => t.tournament_date >= new Date().toISOString().split("T")[0]);
-  const past = tournaments.filter((t) => t.tournament_date < new Date().toISOString().split("T")[0]);
+  const today    = new Date().toISOString().split("T")[0];
+  const upcoming = tournaments.filter((t) => t.tournament_date >= today);
+  const past     = tournaments.filter((t) => t.tournament_date < today);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -62,8 +60,8 @@ function TournamentCard({ t }: { t: Tournament & { entry_count: number } }) {
   const statusLabel = TOURNAMENT_STATUS_LABELS[t.status] ?? t.status;
   const statusColor =
     t.status === "registration_open" ? "bg-green-100 text-green-800" :
-    t.status === "completed" ? "bg-gray-100 text-gray-600" :
-    t.status === "cancelled" ? "bg-red-100 text-red-700" :
+    t.status === "completed"         ? "bg-gray-100 text-gray-600" :
+    t.status === "cancelled"         ? "bg-red-100 text-red-700" :
     "bg-blue-100 text-blue-800";
 
   const isFull = t.max_entries != null && t.entry_count >= t.max_entries;

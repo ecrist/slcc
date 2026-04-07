@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { execute } from "@/lib/db";
 
 // Square payment creation endpoint
-// In production, this uses the Square Payments API to create a checkout
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { membership_id, amount, description } = body;
@@ -19,14 +18,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Dynamic import to avoid errors when Square isn't configured
     const { getSquareClient, getSquareLocationId } = await import("@/lib/square/client");
-    const client = getSquareClient();
+    const client     = await getSquareClient();
+    const locationId = await getSquareLocationId();
 
     const response = await client.checkoutApi.createPaymentLink({
       idempotencyKey: `membership-${membership_id}-${Date.now()}`,
       order: {
-        locationId: getSquareLocationId(),
+        locationId,
         lineItems: [
           {
             name: description || "Swan Lake CC Membership",
@@ -43,15 +42,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update membership with payment info
     if (response.result.paymentLink) {
-      const db = getDb();
-      db.prepare("UPDATE memberships SET payment_id = ?, payment_status = 'processing' WHERE id = ?")
-        .run(response.result.paymentLink.id, membership_id);
+      await execute(
+        "UPDATE memberships SET payment_id = $1, payment_status = 'processing' WHERE id = $2",
+        [response.result.paymentLink.id, membership_id]
+      );
 
       return NextResponse.json({
         payment_url: response.result.paymentLink.url,
-        payment_id: response.result.paymentLink.id,
+        payment_id:  response.result.paymentLink.id,
       });
     }
 

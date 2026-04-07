@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { queryOne, execute } from "@/lib/db";
 
 export async function POST(
   request: NextRequest,
@@ -13,12 +13,10 @@ export async function POST(
     return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
   }
 
-  const db = getDb();
-
-  const event = db.prepare("SELECT * FROM events WHERE id = ?").get(id) as {
-    max_participants: number | null;
-    current_participants: number;
-  } | undefined;
+  const event = await queryOne<{ max_participants: number | null; current_participants: number }>(
+    "SELECT max_participants, current_participants FROM events WHERE id = $1",
+    [id]
+  );
 
   if (!event) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -30,13 +28,15 @@ export async function POST(
     return NextResponse.json({ error: "Not enough spots available" }, { status: 409 });
   }
 
-  db.prepare(
-    "INSERT INTO event_registrations (event_id, name, email, phone, party_size) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, name, email, phone || null, size);
+  await execute(
+    "INSERT INTO event_registrations (event_id, name, email, phone, party_size) VALUES ($1,$2,$3,$4,$5)",
+    [id, name, email, phone || null, size]
+  );
 
-  db.prepare(
-    "UPDATE events SET current_participants = current_participants + ? WHERE id = ?"
-  ).run(size, id);
+  await execute(
+    "UPDATE events SET current_participants = current_participants + $1 WHERE id = $2",
+    [size, id]
+  );
 
   return NextResponse.json({ message: "Registration confirmed" }, { status: 201 });
 }

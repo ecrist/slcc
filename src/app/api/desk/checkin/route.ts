@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/admin";
-import { getDb } from "@/lib/db";
+import { queryOne, execute } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -29,35 +29,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
-  const db = getDb();
-
-  const result = db
-    .prepare(
-      `INSERT INTO checkins
-        (type, name, email, players, holes, carts_requested, buggies_requested,
-         clubs_requested, personal_cart_drop, membership_id, tee_time_id, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
+  const { id } = await execute(
+    `INSERT INTO checkins
+       (type, name, email, players, holes, carts_requested, buggies_requested,
+        clubs_requested, personal_cart_drop, membership_id, tee_time_id, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     RETURNING id`,
+    [
       type, name, email ?? null, players, holes,
       carts_requested, buggies_requested, clubs_requested, personal_cart_drop,
-      membership_id ?? null, tee_time_id ?? null, notes ?? null
-    );
+      membership_id ?? null, tee_time_id ?? null, notes ?? null,
+    ]
+  );
 
-  // If linked to a tee time reservation, mark it as checked in
+  // If linked to a tee time, mark the group as checked in
   if (tee_time_id) {
-    const row = db.prepare("SELECT group_booking_id FROM tee_times WHERE id = ?").get(tee_time_id) as
-      | { group_booking_id: string | null } | undefined;
+    const row = await queryOne<{ group_booking_id: string | null }>(
+      "SELECT group_booking_id FROM tee_times WHERE id = $1",
+      [tee_time_id]
+    );
     if (row?.group_booking_id) {
-      db.prepare(
-        "UPDATE tee_times SET checked_in = 1, checked_in_at = datetime('now') WHERE group_booking_id = ?"
-      ).run(row.group_booking_id);
+      await execute(
+        "UPDATE tee_times SET checked_in = 1, checked_in_at = NOW() WHERE group_booking_id = $1",
+        [row.group_booking_id]
+      );
     } else {
-      db.prepare(
-        "UPDATE tee_times SET checked_in = 1, checked_in_at = datetime('now') WHERE id = ?"
-      ).run(tee_time_id);
+      await execute(
+        "UPDATE tee_times SET checked_in = 1, checked_in_at = NOW() WHERE id = $1",
+        [tee_time_id]
+      );
     }
   }
 
-  return NextResponse.json({ id: result.lastInsertRowid }, { status: 201 });
+  return NextResponse.json({ id }, { status: 201 });
 }

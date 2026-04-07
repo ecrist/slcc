@@ -8,10 +8,9 @@
 
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/admin";
-import { getDb } from "@/lib/db";
+import { queryOne, execute } from "@/lib/db";
 import { MEMBERSHIP_TYPES, type MembershipType } from "@/lib/types";
 import { redirect } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
 
 export default async function NfcCheckinPage({
   params,
@@ -20,14 +19,13 @@ export default async function NfcCheckinPage({
 }) {
   const { token } = await params;
 
-  const db = getDb();
-  const member = db
-    .prepare(
-      "SELECT id, first_name, last_name, email, membership_type, status FROM memberships WHERE nfc_token = ?"
-    )
-    .get(token) as
-    | { id: number; first_name: string; last_name: string; email: string; membership_type: string; status: string }
-    | undefined;
+  const member = await queryOne<{
+    id: number; first_name: string; last_name: string;
+    email: string; membership_type: string; status: string;
+  }>(
+    "SELECT id, first_name, last_name, email, membership_type, status FROM memberships WHERE nfc_token = $1",
+    [token]
+  );
 
   if (!member) {
     return (
@@ -43,18 +41,16 @@ export default async function NfcCheckinPage({
   }
 
   const session = await auth();
-  const isDesk = session?.user?.email && isAdminEmail(session.user.email);
+  const isDesk  = session?.user?.email && (await isAdminEmail(session.user.email));
 
   if (isDesk && member.status === "active") {
-    // Auto check-in and redirect back to desk
-    db.prepare(
-      `INSERT INTO checkins (type, name, email, players, holes, membership_id)
-       VALUES ('nfc', ?, ?, 1, 18, ?)`
-    ).run(`${member.first_name} ${member.last_name}`, member.email, member.id);
+    await execute(
+      "INSERT INTO checkins (type, name, email, players, holes, membership_id) VALUES ('nfc', $1, $2, 1, 18, $3)",
+      [`${member.first_name} ${member.last_name}`, member.email, member.id]
+    );
     redirect(`/desk?checked_in=${encodeURIComponent(member.first_name + " " + member.last_name)}`);
   }
 
-  // Not signed in as desk, or membership inactive — show info card
   const typeName = MEMBERSHIP_TYPES[member.membership_type as MembershipType]?.name ?? member.membership_type;
 
   return (

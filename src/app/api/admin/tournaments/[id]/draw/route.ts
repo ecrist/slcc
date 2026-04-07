@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { queryOne, query, withTransaction } from "@/lib/db";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/admin";
 
 type Params = { params: Promise<{ id: string }> };
 
-// POST — run the blind draw for a luck_of_the_draw tournament
-// Also works as a simple random team assignment for scramble/best_ball when
-// players registered individually (same algorithm, different label).
 export async function POST(_req: NextRequest, { params }: Params) {
   const session = await auth();
-  if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
-  const db = getDb();
 
-  const tournament = db.prepare("SELECT * FROM tournaments WHERE id = ?").get(id) as {
-    id: number; format: string; team_size: number; status: string;
-  } | undefined;
+  const tournament = await queryOne<{ id: number; format: string; team_size: number; status: string }>(
+    "SELECT * FROM tournaments WHERE id = $1",
+    [id]
+  );
   if (!tournament) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const drawableFormats = ["luck_of_the_draw", "stroke_play", "stableford", "scramble", "best_ball"];
@@ -27,65 +24,68 @@ export async function POST(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Draw is not applicable for this format" }, { status: 400 });
   }
 
-  // Pull entries in random order (SQLite RANDOM() gives true randomness per draw)
-  const entries = db
-    .prepare("SELECT id, handicap FROM tournament_entries WHERE tournament_id = ? ORDER BY RANDOM()")
-    .all(id) as { id: number; handicap: number | null }[];
+  // Pull entries in random order
+  const entries = await query<{ id: number; handicap: number | null }>(
+    "SELECT id, handicap FROM tournament_entries WHERE tournament_id = $1 ORDER BY RANDOM()",
+    [id]
+  );
 
   if (entries.length < 1) {
     return NextResponse.json({ error: "No entries to draw" }, { status: 400 });
   }
 
-  const teamSize = tournament.team_size ?? 2;
-
-  // Clear any previous draw
-  db.prepare("UPDATE tournament_entries SET team_id = NULL, flight = NULL WHERE tournament_id = ?").run(id);
-  db.prepare("DELETE FROM tournament_teams WHERE tournament_id = ?").run(id);
-
-  // For stroke_play / stableford: one "team" per player (individual format)
+  const teamSize   = tournament.team_size ?? 2;
   const isIndividual = ["stroke_play", "stableford"].includes(tournament.format);
 
-  const insertTeam = db.prepare(
-    "INSERT INTO tournament_teams (tournament_id, team_name) VALUES (?, ?)"
-  );
-  const assignEntry = db.prepare(
-    "UPDATE tournament_entries SET team_id = ?, flight = ? WHERE id = ?"
-  );
+  await withTransaction(async (q) => {
+    // Clear previous draw
+    await q("UPDATE tournament_entries SET team_id = NULL, flight = NULL WHERE tournament_id = $1", [id]);
+    await q("DELETE FROM tournament_teams WHERE tournament_id = $1", [id]);
 
-  db.transaction(() => {
     if (isIndividual) {
-      entries.forEach((entry, i) => {
-        const teamResult = insertTeam.run(id, `Player ${i + 1}`);
-        assignEntry.run(teamResult.lastInsertRowid, null, entry.id);
-      });
+      for (let i = 0; i < entries.length; i++) {
+        const teamRes = await q(
+          "INSERT INTO tournament_teams (tournament_id, team_name) VALUES ($1,$2) RETURNING id",
+          [id, `Player ${i + 1}`]
+        );
+        await q(
+          "UPDATE tournament_entries SET team_id = $1, flight = NULL WHERE id = $2",
+          [teamRes.rows[0].id, entries[i].id]
+        );
+      }
     } else {
-      // Group into teams of teamSize; last team may be smaller
+      // Group into teams of teamSize
       const chunks: (typeof entries)[] = [];
       for (let i = 0; i < entries.length; i += teamSize) {
         chunks.push(entries.slice(i, i + teamSize));
       }
-
-      // If the last chunk is less than half team size AND there are other chunks,
-      // distribute remaining players across the last full teams
+      // Redistribute small remainder across existing teams
       if (chunks.length > 1 && chunks[chunks.length - 1].length < Math.ceil(teamSize / 2)) {
         const leftovers = chunks.pop()!;
-        leftovers.forEach((entry, i) => {
-          chunks[i % chunks.length].push(entry);
-        });
+        leftovers.forEach((entry, i) => chunks[i % chunks.length].push(entry));
       }
 
-      chunks.forEach((chunk, i) => {
-        const teamResult = insertTeam.run(id, `Team ${i + 1}`);
-        chunk.forEach((entry) => assignEntry.run(teamResult.lastInsertRowid, null, entry.id));
-      });
+      for (let i = 0; i < chunks.length; i++) {
+        const teamRes = await q(
+          "INSERT INTO tournament_teams (tournament_id, team_name) VALUES ($1,$2) RETURNING id",
+          [id, `Team ${i + 1}`]
+        );
+        for (const entry of chunks[i]) {
+          await q(
+            "UPDATE tournament_entries SET team_id = $1, flight = NULL WHERE id = $2",
+            [teamRes.rows[0].id, entry.id]
+          );
+        }
+      }
     }
-  })();
 
-  db.prepare("UPDATE tournaments SET status = 'draw_complete' WHERE id = ?").run(id);
+    await q("UPDATE tournaments SET status = 'draw_complete' WHERE id = $1", [id]);
+  });
 
-  const teamCount = (db
-    .prepare("SELECT COUNT(*) as n FROM tournament_teams WHERE tournament_id = ?")
-    .get(id) as { n: number }).n;
+  const countRow = await queryOne<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM tournament_teams WHERE tournament_id = $1",
+    [id]
+  );
 
-  return NextResponse.json({ ok: true, teams_created: teamCount });
+  return NextResponse.json({ ok: true, teams_created: countRow?.n ?? 0 });
 }

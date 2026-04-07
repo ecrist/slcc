@@ -1,49 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { query, queryOne, execute, withTransaction } from "@/lib/db";
 import { getConfigValue } from "@/lib/admin";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import { sendTeeTimeConfirmation } from "@/lib/email";
 
-function getEquipmentAvailability(db: ReturnType<typeof getDb>, date: string) {
-  const cartFeePerNine = parseFloat(getConfigValue("cart_fee_per_9") ?? "10");
-  const buggyFee = parseFloat(getConfigValue("buggy_fee") ?? "5");
-  const clubsFee = parseFloat(getConfigValue("clubs_fee") ?? "15");
-  const personalCartDropFee = parseFloat(getConfigValue("personal_cart_drop_fee") ?? "15");
+async function getEquipmentAvailability(date: string) {
+  const cartFeePerNine    = parseFloat((await getConfigValue("cart_fee_per_9"))         ?? "10");
+  const buggyFee          = parseFloat((await getConfigValue("buggy_fee"))              ?? "5");
+  const clubsFee          = parseFloat((await getConfigValue("clubs_fee"))              ?? "15");
+  const personalCartDropFee = parseFloat((await getConfigValue("personal_cart_drop_fee")) ?? "15");
 
-  // Count available units per type from the equipment table
-  const totals = db
-    .prepare("SELECT type, COUNT(*) as n FROM equipment WHERE status = 'available' GROUP BY type")
-    .all() as { type: string; n: number }[];
+  const totals = await query<{ type: string; n: number }>(
+    "SELECT type, COUNT(*)::int AS n FROM equipment WHERE status = 'available' GROUP BY type"
+  );
   const byType: Record<string, number> = {};
   for (const row of totals) byType[row.type] = row.n;
 
-  // Count how many are already booked for this date (lead slot only)
-  const booked = db
-    .prepare(
-      `SELECT
-        COALESCE(SUM(carts_requested), 0)  AS carts,
-        COALESCE(SUM(buggies_requested), 0) AS buggies,
-        COALESCE(SUM(clubs_requested), 0)   AS clubs
-       FROM tee_times
-       WHERE date = ? AND status != 'cancelled' AND slot_index = 0`
-    )
-    .get(date) as { carts: number; buggies: number; clubs: number };
+  const booked = await queryOne<{ carts: number; buggies: number; clubs: number }>(
+    `SELECT
+       COALESCE(SUM(carts_requested), 0)::int  AS carts,
+       COALESCE(SUM(buggies_requested), 0)::int AS buggies,
+       COALESCE(SUM(clubs_requested), 0)::int   AS clubs
+     FROM tee_times
+     WHERE date = $1 AND status != 'cancelled' AND slot_index = 0`,
+    [date]
+  );
 
-  const cartTotal = byType["cart"] ?? 0;
+  const cartTotal  = byType["cart"]  ?? 0;
   const buggyTotal = byType["buggy"] ?? 0;
   const clubsTotal = byType["clubs"] ?? 0;
 
   return {
     cartTotal,
-    cartsBooked: booked.carts,
-    cartsAvailable: Math.max(0, cartTotal - booked.carts),
+    cartsBooked:    booked?.carts   ?? 0,
+    cartsAvailable: Math.max(0, cartTotal  - (booked?.carts   ?? 0)),
     buggyTotal,
-    buggiesBooked: booked.buggies,
-    buggiesAvailable: Math.max(0, buggyTotal - booked.buggies),
+    buggiesBooked:    booked?.buggies ?? 0,
+    buggiesAvailable: Math.max(0, buggyTotal - (booked?.buggies ?? 0)),
     clubsTotal,
-    clubsBooked: booked.clubs,
-    clubsAvailable: Math.max(0, clubsTotal - booked.clubs),
+    clubsBooked:    booked?.clubs   ?? 0,
+    clubsAvailable: Math.max(0, clubsTotal - (booked?.clubs   ?? 0)),
     cartFeePerNine,
     buggyFee,
     clubsFee,
@@ -57,14 +54,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Date parameter required" }, { status: 400 });
   }
 
-  const db = getDb();
-  const bookedSlots = db
-    .prepare(
-      "SELECT time, players, player_name, group_booking_id, slot_index FROM tee_times WHERE date = ? AND status != 'cancelled' ORDER BY time"
-    )
-    .all(date);
-
-  const equipment = getEquipmentAvailability(db, date);
+  const bookedSlots = await query(
+    "SELECT time, players, player_name, group_booking_id, slot_index FROM tee_times WHERE date = $1 AND status != 'cancelled' ORDER BY time",
+    [date]
+  );
+  const equipment = await getEquipmentAvailability(date);
 
   return NextResponse.json({ bookedSlots, equipment });
 }
@@ -80,10 +74,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const playerCount = Math.max(1, Math.min(12, parseInt(players) || 1));
-  const slotsNeeded = Math.min(3, Math.ceil(playerCount / 4));
-
-  const startIdx = TEE_TIME_SLOTS.indexOf(time);
+  const playerCount  = Math.max(1, Math.min(12, parseInt(players) || 1));
+  const slotsNeeded  = Math.min(3, Math.ceil(playerCount / 4));
+  const startIdx     = TEE_TIME_SLOTS.indexOf(time);
   if (startIdx === -1) {
     return NextResponse.json({ error: "Invalid time slot" }, { status: 400 });
   }
@@ -95,87 +88,63 @@ export async function POST(request: NextRequest) {
   }
 
   const timesToBook = TEE_TIME_SLOTS.slice(startIdx, startIdx + slotsNeeded);
-  const db = getDb();
-  const groupId = uuidv4();
+  const groupId     = uuidv4();
 
-  // Validate equipment requests against available inventory
-  const avail = getEquipmentAvailability(db, date);
-  const cartsWanted = Math.max(0, parseInt(carts_requested) || 0);
+  const avail         = await getEquipmentAvailability(date);
+  const cartsWanted   = Math.max(0, parseInt(carts_requested)   || 0);
   const buggiesWanted = Math.max(0, parseInt(buggies_requested) || 0);
-  const clubsWanted = Math.max(0, parseInt(clubs_requested) || 0);
+  const clubsWanted   = Math.max(0, parseInt(clubs_requested)   || 0);
   const personalCartDrop = personal_cart_drop ? 1 : 0;
 
-  if (cartsWanted > avail.cartsAvailable) {
-    return NextResponse.json(
-      { error: `Only ${avail.cartsAvailable} golf cart(s) available on this date.` },
-      { status: 409 }
-    );
-  }
-  if (buggiesWanted > avail.buggiesAvailable) {
-    return NextResponse.json(
-      { error: `Only ${avail.buggiesAvailable} walking buggy/buggies available on this date.` },
-      { status: 409 }
-    );
-  }
-  if (clubsWanted > avail.clubsAvailable) {
-    return NextResponse.json(
-      { error: `Only ${avail.clubsAvailable} club set(s) available on this date.` },
-      { status: 409 }
-    );
-  }
-
-  const checkAndInsert = db.transaction(() => {
-    for (const slotTime of timesToBook) {
-      const existing = db
-        .prepare("SELECT id FROM tee_times WHERE date = ? AND time = ? AND status != 'cancelled'")
-        .get(date, slotTime);
-      if (existing) throw new Error("SLOT_TAKEN");
-    }
-
-    const stmt = db.prepare(`
-      INSERT INTO tee_times
-        (date, time, players, player_name, player_email, player_phone,
-         holes, cart, notes, group_booking_id, slot_index,
-         carts_requested, buggies_requested, clubs_requested, personal_cart_drop)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const ids: number[] = [];
-    for (let i = 0; i < timesToBook.length; i++) {
-      const isLead = i === 0;
-      const result = stmt.run(
-        date, timesToBook[i], playerCount,
-        player_name, player_email, player_phone || null,
-        holes || 18,
-        cartsWanted > 0 ? 1 : 0,
-        notes || null,
-        groupId, i,
-        isLead ? cartsWanted : 0,
-        isLead ? buggiesWanted : 0,
-        isLead ? clubsWanted : 0,
-        isLead ? personalCartDrop : 0
-      );
-      ids.push(result.lastInsertRowid as number);
-    }
-    return ids;
-  });
+  if (cartsWanted   > avail.cartsAvailable)   return NextResponse.json({ error: `Only ${avail.cartsAvailable} golf cart(s) available on this date.` },          { status: 409 });
+  if (buggiesWanted > avail.buggiesAvailable) return NextResponse.json({ error: `Only ${avail.buggiesAvailable} walking buggy/buggies available on this date.` }, { status: 409 });
+  if (clubsWanted   > avail.clubsAvailable)   return NextResponse.json({ error: `Only ${avail.clubsAvailable} club set(s) available on this date.` },            { status: 409 });
 
   try {
-    const ids = checkAndInsert.immediate();
+    const ids = await withTransaction(async (q) => {
+      // Verify all needed slots are still open
+      for (const slotTime of timesToBook) {
+        const existing = await q(
+          "SELECT id FROM tee_times WHERE date = $1 AND time = $2 AND status != 'cancelled'",
+          [date, slotTime]
+        );
+        if (existing.rows[0]) throw new Error("SLOT_TAKEN");
+      }
 
-    // Send confirmation email (non-blocking)
+      const insertedIds: number[] = [];
+      for (let i = 0; i < timesToBook.length; i++) {
+        const isLead = i === 0;
+        const res = await q(
+          `INSERT INTO tee_times
+             (date, time, players, player_name, player_email, player_phone,
+              holes, cart, notes, group_booking_id, slot_index,
+              carts_requested, buggies_requested, clubs_requested, personal_cart_drop)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           RETURNING id`,
+          [
+            date, timesToBook[i], playerCount,
+            player_name, player_email, player_phone || null,
+            holes || 18,
+            cartsWanted > 0 ? 1 : 0,
+            notes || null,
+            groupId, i,
+            isLead ? cartsWanted   : 0,
+            isLead ? buggiesWanted : 0,
+            isLead ? clubsWanted   : 0,
+            isLead ? personalCartDrop : 0,
+          ]
+        );
+        insertedIds.push(res.rows[0].id as number);
+      }
+      return insertedIds;
+    });
+
     if (player_email) {
       sendTeeTimeConfirmation({
-        to: player_email,
-        player_name,
-        date,
-        time,
-        players: playerCount,
-        holes: holes || 18,
+        to: player_email, player_name, date, time,
+        players: playerCount, holes: holes || 18,
         slots: timesToBook,
-        carts: cartsWanted,
-        buggies: buggiesWanted,
-        clubs: clubsWanted,
+        carts: cartsWanted, buggies: buggiesWanted, clubs: clubsWanted,
         personal_cart_drop: personalCartDrop === 1,
         group_booking_id: groupId,
       }).catch(() => {});
@@ -206,7 +175,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    if (err instanceof Error && err.message.includes("UNIQUE constraint failed")) {
+    if (err instanceof Error && err.message.includes("unique")) {
       return NextResponse.json(
         { error: "This time slot was just booked. Please choose another time." },
         { status: 409 }
@@ -222,17 +191,18 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "ID parameter required" }, { status: 400 });
   }
 
-  const db = getDb();
-  const row = db.prepare("SELECT group_booking_id FROM tee_times WHERE id = ?").get(id) as
-    | { group_booking_id: string | null }
-    | undefined;
+  const row = await queryOne<{ group_booking_id: string | null }>(
+    "SELECT group_booking_id FROM tee_times WHERE id = $1",
+    [id]
+  );
 
   if (row?.group_booking_id) {
-    db.prepare("UPDATE tee_times SET status = 'cancelled' WHERE group_booking_id = ?").run(
-      row.group_booking_id
+    await execute(
+      "UPDATE tee_times SET status = 'cancelled' WHERE group_booking_id = $1",
+      [row.group_booking_id]
     );
   } else {
-    db.prepare("UPDATE tee_times SET status = 'cancelled' WHERE id = ?").run(id);
+    await execute("UPDATE tee_times SET status = 'cancelled' WHERE id = $1", [id]);
   }
 
   return NextResponse.json({ message: "Tee time cancelled" });

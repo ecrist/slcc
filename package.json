@@ -7,24 +7,25 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:setup": "tsx src/lib/db/setup.ts"
+    "db:migrate": "tsx src/lib/db/migrate.ts",
+    "db:seed": "tsx src/lib/db/seed.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/nodemailer": "^7.0.11",
+    "@types/pg": "^8.11.0",
     "autoprefixer": "^10.4.27",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.7.0",
     "next": "^15.1.0",
     "next-auth": "^5.0.0-beta.30",
     "nodemailer": "^8.0.2",
+    "pg": "^8.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "square": "^39.0.0",
     "uuid": "^11.0.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

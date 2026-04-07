@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { queryOne, execute } from "@/lib/db";
 import { sendTournamentRegistration } from "@/lib/email";
 import { TOURNAMENT_FORMAT_LABELS } from "@/lib/types";
 import type { TournamentFormat } from "@/lib/types";
@@ -8,14 +8,14 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  const db = getDb();
 
-  const tournament = db
-    .prepare("SELECT * FROM tournaments WHERE id = ? AND is_public = 1")
-    .get(id) as {
-      id: number; title: string; tournament_date: string; format: TournamentFormat;
-      entry_fee: number; max_entries: number | null; status: string;
-    } | undefined;
+  const tournament = await queryOne<{
+    id: number; title: string; tournament_date: string; format: TournamentFormat;
+    entry_fee: number; max_entries: number | null; status: string;
+  }>(
+    "SELECT * FROM tournaments WHERE id = $1 AND is_public = 1",
+    [id]
+  );
 
   if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
   if (tournament.status !== "registration_open") {
@@ -23,10 +23,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   if (tournament.max_entries) {
-    const count = (db
-      .prepare("SELECT COUNT(*) as n FROM tournament_entries WHERE tournament_id = ?")
-      .get(id) as { n: number }).n;
-    if (count >= tournament.max_entries) {
+    const countRow = await queryOne<{ n: number }>(
+      "SELECT COUNT(*)::int AS n FROM tournament_entries WHERE tournament_id = $1",
+      [id]
+    );
+    if ((countRow?.n ?? 0) >= tournament.max_entries) {
       return NextResponse.json({ error: "This tournament is full" }, { status: 400 });
     }
   }
@@ -38,17 +39,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "player_name is required" }, { status: 400 });
   }
 
-  const result = db
-    .prepare(
-      `INSERT INTO tournament_entries
-        (tournament_id, player_name, player_email, player_phone, handicap, notes, payment_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
+  const { id: entryId } = await execute(
+    `INSERT INTO tournament_entries
+       (tournament_id, player_name, player_email, player_phone, handicap, notes, payment_status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     RETURNING id`,
+    [
       id, player_name, player_email ?? null, player_phone ?? null,
       handicap ?? null, notes ?? null,
       tournament.entry_fee > 0 ? "pending" : "free",
-    );
+    ]
+  );
 
   if (player_email) {
     await sendTournamentRegistration({
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
   }
 
-  return NextResponse.json({ id: result.lastInsertRowid }, { status: 201 });
+  return NextResponse.json({ id: entryId }, { status: 201 });
 }
 
 // DELETE — withdraw entry
@@ -70,12 +71,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const entryId = request.nextUrl.searchParams.get("entry_id");
   if (!entryId) return NextResponse.json({ error: "entry_id required" }, { status: 400 });
 
-  const db = getDb();
-  const entry = db
-    .prepare("SELECT id FROM tournament_entries WHERE id = ? AND tournament_id = ?")
-    .get(entryId, id);
+  const entry = await queryOne<{ id: number }>(
+    "SELECT id FROM tournament_entries WHERE id = $1 AND tournament_id = $2",
+    [entryId, id]
+  );
   if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  db.prepare("DELETE FROM tournament_entries WHERE id = ?").run(entryId);
+  await execute("DELETE FROM tournament_entries WHERE id = $1", [entryId]);
   return NextResponse.json({ ok: true });
 }

@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: swan-lake-cc
+    runtime: node
+    plan: starter          # $7/mo — keeps the instance always on (no cold starts)
+    buildCommand: npm install --legacy-peer-deps && npm run db:migrate && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      # ── Database (Neon) ───────────────────────────────────────────────────────
+      - key: DATABASE_URL
+        sync: false        # paste from Neon dashboard — use the pooled connection string
+
+      # ── NextAuth ──────────────────────────────────────────────────────────────
+      - key: AUTH_SECRET
+        generateValue: true   # Render auto-generates a secure random value
+      - key: NEXTAUTH_URL
+        sync: false           # e.g. https://swan-lake-cc.onrender.com
+
+      # ── App URL (used in emails) ──────────────────────────────────────────────
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false           # same as NEXTAUTH_URL
+
+      # ── OAuth (optional) ──────────────────────────────────────────────────────
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: APPLE_ID
+        sync: false
+      - key: APPLE_SECRET
+        sync: false
+
+      # ── Square Payments ───────────────────────────────────────────────────────
+      - key: SQUARE_ACCESS_TOKEN
+        sync: false
+      - key: SQUARE_APPLICATION_ID
+        sync: false
+      - key: SQUARE_LOCATION_ID
+        sync: false
+      - key: SQUARE_ENVIRONMENT
+        value: sandbox        # change to "production" when ready to go live
+
+      # ── QuickBooks (optional) ─────────────────────────────────────────────────
+      - key: QUICKBOOKS_CLIENT_ID
+        sync: false
+      - key: QUICKBOOKS_CLIENT_SECRET
+        sync: false
+
+      # ── First-run admin password ──────────────────────────────────────────────
+      # Only used on first db:migrate. Remove after first deploy.
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # ── Billing cron (optional) ───────────────────────────────────────────────
+      - key: CRON_SECRET
+        generateValue: true

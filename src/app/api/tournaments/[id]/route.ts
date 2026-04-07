@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { queryOne, query, execute } from "@/lib/db";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -8,31 +8,31 @@ type Params = { params: Promise<{ id: string }> };
 // GET /api/tournaments/[id] — tournament detail with entries and teams
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
-  const db = getDb();
 
-  const tournament = db.prepare("SELECT * FROM tournaments WHERE id = ?").get(id);
+  const tournament = await queryOne("SELECT * FROM tournaments WHERE id = $1", [id]);
   if (!tournament) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const entries = db
-    .prepare("SELECT * FROM tournament_entries WHERE tournament_id = ? ORDER BY created_at ASC")
-    .all(id);
+  const entries = await query(
+    "SELECT * FROM tournament_entries WHERE tournament_id = $1 ORDER BY created_at ASC",
+    [id]
+  );
 
-  const teams = db
-    .prepare(
-      `SELECT t.*, json_group_array(json_object(
-          'id', e.id, 'player_name', e.player_name, 'handicap', e.handicap, 'flight', e.flight
-        )) AS members
-       FROM tournament_teams t
-       LEFT JOIN tournament_entries e ON e.team_id = t.id
-       WHERE t.tournament_id = ?
-       GROUP BY t.id
-       ORDER BY t.place ASC NULLS LAST, t.net_score ASC NULLS LAST, t.gross_score ASC NULLS LAST`
-    )
-    .all(id) as (Record<string, unknown> & { members: string })[];
+  const teams = await query<Record<string, unknown> & { members: Array<Record<string, unknown>> | null }>(
+    `SELECT t.*,
+       COALESCE(json_agg(json_build_object(
+         'id', e.id, 'player_name', e.player_name, 'handicap', e.handicap, 'flight', e.flight
+       )) FILTER (WHERE e.id IS NOT NULL), '[]') AS members
+     FROM tournament_teams t
+     LEFT JOIN tournament_entries e ON e.team_id = t.id
+     WHERE t.tournament_id = $1
+     GROUP BY t.id
+     ORDER BY t.place ASC NULLS LAST, t.net_score ASC NULLS LAST, t.gross_score ASC NULLS LAST`,
+    [id]
+  );
 
   const teamsWithMembers = teams.map((t) => ({
     ...t,
-    members: JSON.parse(t.members as string).filter((m: Record<string, unknown>) => m.id !== null),
+    members: (t.members ?? []).filter((m) => m.id !== null),
   }));
 
   return NextResponse.json({ tournament, entries, teams: teamsWithMembers });
@@ -41,15 +41,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
 // PUT /api/tournaments/[id] — admin update
 export async function PUT(request: NextRequest, { params }: Params) {
   const session = await auth();
-  if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
   const body = await request.json();
-  const db = getDb();
 
-  const existing = db.prepare("SELECT id FROM tournaments WHERE id = ?").get(id);
+  const existing = await queryOne<{ id: number }>("SELECT id FROM tournaments WHERE id = $1", [id]);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const fields = [
@@ -60,9 +59,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const updates = fields.filter((f) => f in body);
   if (updates.length === 0) return NextResponse.json({ ok: true });
 
-  const setClauses = updates.map((f) => `${f} = ?`).join(", ");
-  const values = updates.map((f) => body[f] ?? null);
-  db.prepare(`UPDATE tournaments SET ${setClauses} WHERE id = ?`).run(...values, id);
+  const setClauses = updates.map((f, i) => `${f} = $${i + 1}`).join(", ");
+  const values = [...updates.map((f) => body[f] ?? null), id];
+  await execute(
+    `UPDATE tournaments SET ${setClauses} WHERE id = $${updates.length + 1}`,
+    values
+  );
 
   return NextResponse.json({ ok: true });
 }
@@ -70,12 +72,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 // DELETE /api/tournaments/[id] — admin delete
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await auth();
-  if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+  if (!session?.user?.email || !(await isAdminEmail(session.user.email))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
-  const db = getDb();
-  db.prepare("DELETE FROM tournaments WHERE id = ?").run(id);
+  await execute("DELETE FROM tournaments WHERE id = $1", [id]);
   return NextResponse.json({ ok: true });
 }

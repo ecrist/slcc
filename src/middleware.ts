@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
-// Middleware runs on the Edge runtime — uses the edge-safe authConfig (no DB,
-// no better-sqlite3). Only checks authentication; admin authorisation (DB lookup)
+// Middleware runs on the Edge runtime — uses the edge-safe authConfig (no DB).
+// Only checks authentication; admin authorisation (PostgreSQL lookup)
 // happens in the server-component admin layout which runs on Node.js.
 export default auth((req) => {
   const isAdminPath = req.nextUrl.pathname.startsWith("/admin");

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { execute } from "@/lib/db";
 
 // QuickBooks Payments / Invoicing endpoint
-// In production, this uses the QuickBooks Online API to create an invoice
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { membership_id, amount, customer_email, customer_name, description } = body;
@@ -20,26 +19,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // In production, this would:
-    // 1. Create or find the customer in QuickBooks
-    // 2. Create an invoice with the membership line item
-    // 3. Send the invoice via email (QuickBooks handles the payment collection)
-    //
-    // const invoice = await qbClient.createInvoice({
-    //   CustomerRef: { value: customerId },
-    //   Line: [{
-    //     Amount: amount,
-    //     DetailType: "SalesItemLineDetail",
-    //     Description: description,
-    //   }],
-    //   BillEmail: { Address: customer_email },
-    // });
-    // await qbClient.sendInvoice(invoice.Id);
-
-    const db = getDb();
     const invoiceRef = `QB-INV-${Date.now()}`;
-    db.prepare("UPDATE memberships SET payment_id = ?, payment_provider = 'quickbooks', payment_status = 'invoiced' WHERE id = ?")
-      .run(invoiceRef, membership_id);
+    await execute(
+      "UPDATE memberships SET payment_id = $1, payment_provider = 'quickbooks', payment_status = 'invoiced' WHERE id = $2",
+      [invoiceRef, membership_id]
+    );
 
     return NextResponse.json({
       message: "QuickBooks invoice created and sent to " + customer_email,

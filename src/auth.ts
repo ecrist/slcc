@@ -3,18 +3,8 @@ import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { getDb } from "@/lib/db";
+import { queryOne } from "@/lib/db";
 import { authConfig } from "@/auth.config";
-
-// Read OAuth credentials from the database at request time so config changes
-// take effect without a server restart.
-function dbCfg(key: string): string {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT value FROM site_config WHERE key = ?")
-    .get(key) as { value: string } | undefined;
-  return row?.value ?? "";
-}
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -26,25 +16,30 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const db = getDb();
-        const user = db
-          .prepare("SELECT * FROM users WHERE email = ?")
-          .get((credentials.email as string).trim().toLowerCase()) as
-          | { id: number; name: string; email: string; password_hash: string }
-          | undefined;
+        const user = await queryOne<{
+          id: number;
+          name: string;
+          email: string;
+          password_hash: string;
+        }>("SELECT * FROM users WHERE email = $1", [
+          (credentials.email as string).trim().toLowerCase(),
+        ]);
         if (!user) return null;
-        const valid = await bcrypt.compare(credentials.password as string, user.password_hash);
+        const valid = await bcrypt.compare(
+          credentials.password as string,
+          user.password_hash
+        );
         if (!valid) return null;
         return { id: String(user.id), name: user.name, email: user.email };
       },
     }),
     Google({
-      clientId: dbCfg("google_client_id"),
-      clientSecret: dbCfg("google_client_secret"),
+      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     }),
     Apple({
-      clientId: dbCfg("apple_id"),
-      clientSecret: dbCfg("apple_secret"),
+      clientId: process.env.APPLE_ID ?? "",
+      clientSecret: process.env.APPLE_SECRET ?? "",
     }),
   ],
 });
