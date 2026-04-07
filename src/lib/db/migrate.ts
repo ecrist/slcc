@@ -197,6 +197,21 @@ async function migrate() {
         net_score     REAL,
         place         INTEGER
       );
+
+      CREATE TABLE IF NOT EXISTS member_charges (
+        id            SERIAL PRIMARY KEY,
+        membership_id INTEGER REFERENCES memberships(id) ON DELETE SET NULL,
+        member_name   TEXT NOT NULL,
+        member_email  TEXT,
+        charge_type   TEXT NOT NULL DEFAULT 'other',
+        description   TEXT NOT NULL,
+        amount        REAL NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'open',
+        notes         TEXT,
+        created_by    TEXT,
+        paid_at       TIMESTAMPTZ,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
 
     // ── Indexes ────────────────────────────────────────────────────────────────
@@ -226,6 +241,7 @@ async function migrate() {
       ["buggy_fee",              "5",               "Walking Buggy Fee ($)",          "Fee to rent a push/pull buggy for a round"],
       ["clubs_fee",              "15",              "Club Rental Fee ($)",            "Fee to rent a set of clubs for a round"],
       ["personal_cart_drop_fee", "15",              "Personal Cart Drop Fee ($)",     "Daily fee for a guest to bring their own golf cart onto the course"],
+      ["cart_storage_fee",       "250",             "Cart Storage Fee ($ / season)",  "Seasonal fee for members to store their personal cart at the club"],
       ["contact_phone",          "(218) 885-3543",  "Contact Phone",                  ""],
       ["contact_email",          "golf@swanlakecc.com", "Contact Email",             ""],
       ["season_start",           "May 1",           "Season Start",                   ""],
