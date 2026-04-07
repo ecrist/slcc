@@ -79,9 +79,12 @@ export default function Header() {
                   />
                 )}
                 <span className="text-white/70 text-sm">{session.user?.name?.split(" ")[0]}</span>
+                <Link href="/admin" className="text-swan-gold hover:text-swan-gold-light transition-colors font-medium text-sm">
+                  Admin
+                </Link>
                 <button
                   onClick={() => signOut()}
-                  className="text-swan-gold hover:text-swan-gold-light transition-colors font-medium text-sm"
+                  className="text-white/60 hover:text-white transition-colors font-medium text-sm"
                 >
                   Sign Out
                 </button>
@@ -130,9 +133,12 @@ export default function Header() {
             {session ? (
               <>
                 <span className="block text-white/70 text-sm">{session.user?.email}</span>
+                <Link href="/admin" className="block text-swan-gold hover:text-swan-gold-light font-medium" onClick={() => setMobileOpen(false)}>
+                  Admin
+                </Link>
                 <button
                   onClick={() => { signOut(); setMobileOpen(false); }}
-                  className="block text-swan-gold hover:text-swan-gold-light font-medium"
+                  className="block text-white/60 hover:text-white font-medium"
                 >
                   Sign Out
                 </button>
