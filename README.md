@@ -11,11 +11,11 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 | Framework | Next.js 15 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS (custom Swan Lake theme) |
-| Database | SQLite via `better-sqlite3` (WAL mode) |
+| Database | PostgreSQL via `pg` (node-postgres) |
 | Auth | NextAuth.js v5 — credentials, Google OAuth, Apple Sign In |
 | Email | Nodemailer (SMTP) |
 | Payments | Square SDK + Web Payments SDK; QuickBooks Payments (ACH/invoice) |
-| POS Webhooks | Square + Toast webhook endpoints (stubs — not yet implemented) |
+| POS Webhooks | Toast webhook receiver (implemented); Square POS webhook (stub) |
 | Process manager | PM2 |
 | Web server | nginx |
 
@@ -94,6 +94,19 @@ Automatic confirmations sent via SMTP (Nodemailer) for:
 
 Configured in Admin → Settings. Silently skips if `smtp_host` is not set.
 
+### Toast POS Integration
+
+When a tab is closed on your Toast terminal, Toast sends a `CHECK_CLOSED` webhook to `/api/webhooks/toast`. The platform:
+
+1. Verifies the HMAC-SHA256 signature using the secret from Admin → Settings → Toast POS
+2. Matches the tab name against active members (exact full-name match, then partial last-name match)
+3. Creates a **Bar Tab** charge in `/admin/billing` linked to the matched member (or as a standalone charge if no match)
+4. Deduplicates automatically — if Toast retries delivery, the duplicate is silently ignored
+
+Charges from Toast are tagged with an orange **TOAST** badge in the billing dashboard. Settle them the same way as manual charges (mark as paid or void).
+
+**Setup:** Admin → Settings → Toast POS → enter your webhook secret and restaurant GUID. Then configure the webhook URL in the Toast Partner Portal: `POST https://book.swanlakecc.com/api/webhooks/toast`
+
 ### Recurring Membership Billing (`/admin/billing`)
 
 - Lists memberships expiring within 30 days
@@ -170,14 +183,15 @@ Full-screen kiosk for the pro shop counter. Installable as a PWA on any device.
 
 ## Environment Variables
 
-Only two variables are required in `.env.local`:
+Three variables are required in `.env.local`:
 
 | Variable | Description |
 |----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string, e.g. `postgresql://user:pass@localhost/swan_lake` |
 | `AUTH_SECRET` | Random secret for signing session tokens. Generate: `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | Full URL of the app, e.g. `https://book.swanlakecc.com` |
 
-All other configuration (SMTP, Square, QuickBooks, Google/Apple OAuth, fees, hours) is managed through Admin → Settings.
+All other configuration (SMTP, Square, QuickBooks, Toast, Google/Apple OAuth, fees, hours) is managed through Admin → Settings.
 
 ---
 

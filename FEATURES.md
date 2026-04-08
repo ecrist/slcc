@@ -22,7 +22,15 @@ This file is the authoritative record of what is implemented. Update it whenever
 
 **Square POS webhook** (`/api/webhooks/square`): Directory stub exists, no implementation yet.
 
-**Toast POS webhook** (`/api/webhooks/toast`): Directory stub exists, no implementation yet.
+**Toast POS webhook** (`/api/webhooks/toast/route.ts`): **Implemented.**
+- Verifies HMAC-SHA256 signature (`Toast-Signature: t=...,v1=...` header) using `toast_webhook_secret` from DB
+- Handles `CHECK_CLOSED` events only; all other event types return `{ ok: true, skipped: true }`
+- Validates `restaurantGuid` against `toast_location_guid` if configured
+- Matches tab name against active memberships (exact full-name match, then partial last-name match)
+- Inserts into `member_charges` with `source='toast'`, `charge_type='bar_tab'`, `external_id='toast-<check_guid>'`
+- Deduplicates via UNIQUE constraint on `external_id` — safe to retry webhook delivery
+- Unmatched tabs create standalone charges (no `membership_id`) so no charges are lost
+- Configure in Admin → Settings → Toast POS; set webhook URL in Toast Partner Portal: `POST /api/webhooks/toast`
 
 ---
 
@@ -41,10 +49,10 @@ This file is the authoritative record of what is implemented. Update it whenever
 
 ## Database
 
-- SQLite via `better-sqlite3`, WAL mode
-- File: `swan-lake.db` in project root
-- Migrations in `src/lib/db/index.ts` (run automatically on startup)
-- Dev seed: `npm run db:setup` (`src/lib/db/setup.ts`)
+- PostgreSQL via `pg` (node-postgres)
+- Connection via `DATABASE_URL` environment variable
+- Migrations: `npm run db:migrate` (`src/lib/db/migrate.ts`) — idempotent, safe to re-run
+- Uses `CREATE TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `ADD COLUMN IF NOT EXISTS`
 
 ### Tables
 
@@ -61,7 +69,7 @@ This file is the authoritative record of what is implemented. Update it whenever
 | `tournament_entries` | Individual player registrations |
 | `tournament_teams` | Teams formed after draw |
 | `equipment` | Physical inventory (carts, buggies, clubs) |
-| `member_charges` | Bar tabs, cart storage, invoices, other charges |
+| `member_charges` | Bar tabs, cart storage, invoices, other charges — includes `source` (manual/toast) and `external_id` (unique dedup key for Toast webhooks) |
 | `checkins` | Desk check-in log (NFC, member search, walk-in, tee time) |
 
 ---
@@ -303,10 +311,11 @@ Emails sent for:
 
 ## Environment Variables
 
-Only two are required:
+Three are required:
 
 | Variable | Value |
 |----------|-------|
+| `DATABASE_URL` | PostgreSQL connection string — `postgresql://user:pass@host/dbname` |
 | `AUTH_SECRET` | 32-byte base64 string — `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | Full app URL, e.g. `https://book.swanlakecc.com` |
 

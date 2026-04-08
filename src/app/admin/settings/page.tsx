@@ -118,6 +118,16 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
+    id: "toast",
+    title: "Toast POS",
+    description: "Receive closed-check webhooks from Toast to automatically create member bar tab charges.",
+    note: "Configure the webhook endpoint in your Toast Partner Portal: POST /api/webhooks/toast",
+    fields: [
+      { key: "toast_webhook_secret", type: "secret" },
+      { key: "toast_location_guid" },
+    ],
+  },
+  {
     id: "security",
     title: "Security",
     fields: [
@@ -128,7 +138,7 @@ const SECTIONS: SectionDef[] = [
 
 const SENSITIVE_KEYS = new Set([
   "smtp_pass", "square_access_token", "quickbooks_client_secret",
-  "google_client_secret", "apple_secret", "cron_secret",
+  "google_client_secret", "apple_secret", "cron_secret", "toast_webhook_secret",
 ]);
 
 // ── Component ─────────────────────────────────────────────────────────────────

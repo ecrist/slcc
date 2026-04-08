@@ -214,6 +214,15 @@ async function migrate() {
       );
     `);
 
+    // ── Column migrations (idempotent) ─────────────────────────────────────────
+    const alterations = [
+      "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS external_id TEXT UNIQUE",
+      "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'",
+    ];
+    for (const sql of alterations) {
+      await client.query(sql);
+    }
+
     // ── Indexes ────────────────────────────────────────────────────────────────
     const indexes = [
       "CREATE INDEX IF NOT EXISTS idx_tournaments_date ON tournaments(tournament_date)",
@@ -273,6 +282,8 @@ async function migrate() {
       ["apple_id",               "",                "Apple Services ID",              "e.g. com.swanlakecc.book — set APPLE_ID env var too"],
       ["apple_secret",           "",                "Apple Private Key",              "Full contents of your .p8 file — set APPLE_SECRET env var too"],
       ["cron_secret",            "",                "Cron Secret",                    "Shared secret for POST /api/admin/billing/renew?secret=… — use a long random string"],
+      ["toast_webhook_secret",   "",                "Toast Webhook Secret",            "HMAC-SHA256 secret from Toast Partner Portal — used to verify incoming webhook signatures"],
+      ["toast_location_guid",    "",                "Toast Restaurant GUID",           "Your restaurant's GUID from the Toast Portal — used to validate that webhooks are for this location"],
     ];
 
     for (const [key, value, label, description] of defaults) {

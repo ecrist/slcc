@@ -32,6 +32,7 @@ interface Charge {
   amount: number;
   status: string;
   notes: string | null;
+  source: string | null;
   created_by: string | null;
   paid_at: string | null;
   created_at: string;
@@ -273,7 +274,14 @@ export default function BillingPage() {
                         <p className="font-medium">{c.member_name}</p>
                         {c.member_email && <p className="text-xs text-gray-400">{c.member_email}</p>}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{CHARGE_TYPES[c.charge_type] ?? c.charge_type}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <div>{CHARGE_TYPES[c.charge_type] ?? c.charge_type}</div>
+                        {c.source && c.source !== "manual" && (
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 uppercase tracking-wide">
+                            {c.source}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <p>{c.description}</p>
                         {c.notes && <p className="text-xs text-gray-400">{c.notes}</p>}

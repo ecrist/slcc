@@ -18,7 +18,7 @@ When a feature is added, changed, or removed, update **both** `README.md` and `F
 
 ## Known Facts (do not contradict without verifying)
 
-- **Database**: SQLite via `better-sqlite3`. NOT PostgreSQL.
+- **Database**: PostgreSQL via `pg` (node-postgres). `DATABASE_URL` env var required. Migrations: `npm run db:migrate`. NOT SQLite.
 - **Payments**: Square (cards, Google Pay, Apple Pay, card-on-file) and QuickBooks (ACH/invoice). **Stripe is not present and was never implemented.**
 - **Email**: Nodemailer over SMTP. NOT SendGrid.
 - **Deployment**: PM2 + nginx. NOT Render or any cloud PaaS.
@@ -26,7 +26,8 @@ When a feature is added, changed, or removed, update **both** `README.md` and `F
 - **Auth**: NextAuth v5. Edge-safe split between `auth.config.ts` (middleware) and `auth.ts` (Node.js). OAuth credentials are read from the DB at runtime and require a server restart to take effect.
 - **PWA and offline support** are fully implemented (`public/sw.js`, `public/manifest.json`, `/app/offline/`, `WakeLock.tsx`). Do not remove this from documentation.
 - **`toast` in `desk/page.tsx`** is a UI notification component, not the Toast POS system.
-- **Toast + Square POS webhooks**: directories exist under `/api/webhooks/` but contain no implementation.
+- **Toast POS webhook** (`/api/webhooks/toast/route.ts`): fully implemented — HMAC-SHA256 verification, CHECK_CLOSED handling, member name matching, dedup via `external_id`. Square POS webhook (`/api/webhooks/square`) is still a stub.
+- **`member_charges`** has `source` (manual/toast) and `external_id` (unique dedup) columns added via migration.
 
 ## Workflow Preferences
 
