@@ -40,6 +40,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/equipment" className="text-gray-300 hover:text-white whitespace-nowrap">
               Equipment
             </Link>
+            <Link href="/admin/contacts" className="text-gray-300 hover:text-white whitespace-nowrap">
+              Contacts
+            </Link>
+            <Link href="/admin/reports" className="text-gray-300 hover:text-white whitespace-nowrap">
+              Reports
+            </Link>
             <Link href="/admin/settings" className="text-gray-300 hover:text-white whitespace-nowrap">
               Settings
             </Link>

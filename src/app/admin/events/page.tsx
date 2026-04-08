@@ -70,6 +70,15 @@ export default function AdminEvents() {
     fetchEvents();
   }
 
+  async function toggleCorporate(evt: GolfEvent) {
+    await fetch("/api/admin/events", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: evt.id, is_corporate_event: evt.is_corporate_event ? 0 : 1 }),
+    });
+    fetchEvents();
+  }
+
   async function handleDelete(id: number) {
     if (!confirm("Delete this event?")) return;
     await fetch(`/api/admin/events?id=${id}`, { method: "DELETE" });
@@ -183,6 +192,7 @@ export default function AdminEvents() {
                 <th className="px-4 py-3 text-left text-sm font-medium">Event</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Type</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Visibility</th>
+                <th className="px-4 py-3 text-center text-sm font-medium">Corporate</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Registered</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Cost</th>
                 <th className="px-4 py-3" />
@@ -223,6 +233,19 @@ export default function AdminEvents() {
                       title="Click to toggle"
                     >
                       {evt.is_public ? "Public" : "Private"}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => toggleCorporate(evt)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        evt.is_corporate_event
+                          ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                      title="Click to toggle corporate event"
+                    >
+                      {evt.is_corporate_event ? "Corporate" : "—"}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-center text-sm">

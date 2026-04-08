@@ -67,7 +67,8 @@ export async function PATCH(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
   const allowed = ["title", "description", "event_date", "start_time", "end_time",
-                   "location", "event_type", "max_participants", "cost", "is_public"];
+                   "location", "event_type", "max_participants", "cost", "is_public",
+                   "is_corporate_event"];
   const updates = Object.entries(fields).filter(([k]) => allowed.includes(k));
   if (updates.length === 0) return NextResponse.json({ error: "No valid fields" }, { status: 400 });
 

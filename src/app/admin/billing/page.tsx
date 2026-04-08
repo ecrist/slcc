@@ -14,7 +14,21 @@ interface Membership {
   payment_status: string;
   status: string;
   end_date: string;
+  credit_limit: number | null;
   created_at: string;
+}
+
+interface Contact {
+  id: number;
+  first_name: string;
+  last_name: string;
+  zip: string | null;
+}
+
+interface CorporateEvent {
+  id: number;
+  title: string;
+  event_date: string;
 }
 
 interface RenewalMembership extends Membership {
@@ -48,6 +62,8 @@ const CHARGE_TYPES: Record<string, string> = {
 
 const EMPTY_CHARGE = {
   membership_id: "",
+  contact_id: "",
+  event_id: "",
   member_name: "",
   member_email: "",
   charge_type: "bar_tab",
@@ -63,6 +79,8 @@ export default function BillingPage() {
   const [pending, setPending] = useState<Membership[]>([]);
   const [renewals, setRenewals] = useState<RenewalMembership[]>([]);
   const [members, setMembers] = useState<Membership[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [corporateEvents, setCorporateEvents] = useState<CorporateEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddCharge, setShowAddCharge] = useState(false);
   const [chargeForm, setChargeForm] = useState({ ...EMPTY_CHARGE });
@@ -79,10 +97,12 @@ export default function BillingPage() {
   async function fetchAll() {
     setLoading(true);
     try {
-      const [memRes, renewRes, chargeRes] = await Promise.all([
+      const [memRes, renewRes, chargeRes, contactRes, eventRes] = await Promise.all([
         fetch("/api/memberships"),
         fetch("/api/admin/billing/renew"),
         fetch(`/api/admin/charges?status=${chargeFilter}`),
+        fetch("/api/admin/contacts"),
+        fetch("/api/admin/events"),
       ]);
       if (memRes.ok) {
         const all: Membership[] = await memRes.json();
@@ -91,6 +111,11 @@ export default function BillingPage() {
       }
       if (renewRes.ok) setRenewals(await renewRes.json());
       if (chargeRes.ok) setCharges(await chargeRes.json());
+      if (contactRes.ok) setContacts(await contactRes.json());
+      if (eventRes.ok) {
+        const evts = await eventRes.json();
+        setCorporateEvents(evts.filter((e: { is_corporate_event: number }) => e.is_corporate_event === 1));
+      }
     } finally {
       setLoading(false);
     }
@@ -127,6 +152,8 @@ export default function BillingPage() {
       body: JSON.stringify({
         ...chargeForm,
         membership_id: chargeForm.membership_id || null,
+        contact_id: chargeForm.contact_id || null,
+        event_id: chargeForm.event_id || null,
         amount: parseFloat(chargeForm.amount),
       }),
     });
@@ -146,10 +173,27 @@ export default function BillingPage() {
     setChargeForm({
       ...chargeForm,
       membership_id: id,
+      contact_id: "",
       member_name: m ? `${m.first_name} ${m.last_name}` : chargeForm.member_name,
       member_email: m?.email ?? chargeForm.member_email,
     });
   }
+
+  function selectContact(id: string) {
+    const c = contacts.find((x) => String(x.id) === id);
+    setChargeForm({
+      ...chargeForm,
+      contact_id: id,
+      membership_id: "",
+      member_name: c ? `${c.first_name} ${c.last_name}` : chargeForm.member_name,
+      member_email: "",
+    });
+  }
+
+  const selectedMember = members.find((m) => String(m.id) === chargeForm.membership_id);
+  const creditUsed = selectedMember?.credit_limit != null
+    ? charges.filter((c) => c.membership_id === selectedMember.id && c.status === "open").reduce((s, c) => s + c.amount, 0)
+    : null;
 
   async function markMemberPaid(m: Membership) {
     setProcessing(m.id);
@@ -340,14 +384,58 @@ export default function BillingPage() {
                       value={chargeForm.membership_id}
                       onChange={(e) => selectMember(e.target.value)}
                     >
-                      <option value="">— Enter name manually —</option>
+                      <option value="">— None —</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.first_name} {m.last_name} ({m.member_number})
                         </option>
                       ))}
                     </select>
+                    {selectedMember?.credit_limit != null && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Credit account: <span className={`font-medium ${creditUsed! >= selectedMember.credit_limit ? "text-red-600" : "text-gray-700"}`}>
+                          ${creditUsed!.toFixed(2)} used of ${selectedMember.credit_limit.toFixed(2)}
+                        </span>
+                      </p>
+                    )}
                   </div>
+                  {contacts.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Walk-in Contact (optional — instead of member)
+                      </label>
+                      <select
+                        className="input-field w-full"
+                        value={chargeForm.contact_id}
+                        onChange={(e) => selectContact(e.target.value)}
+                        disabled={!!chargeForm.membership_id}
+                      >
+                        <option value="">— None —</option>
+                        {contacts.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.first_name} {c.last_name}{c.zip ? ` (${c.zip})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {corporateEvents.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Corporate Event (optional — excludes from personal spend)
+                      </label>
+                      <select
+                        className="input-field w-full"
+                        value={chargeForm.event_id}
+                        onChange={(e) => setChargeForm({ ...chargeForm, event_id: e.target.value })}
+                      >
+                        <option value="">— Personal charge —</option>
+                        {corporateEvents.map((e) => (
+                          <option key={e.id} value={e.id}>{e.title} ({e.event_date})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
                     <input className="input-field w-full" value={chargeForm.member_name}

@@ -214,10 +214,35 @@ async function migrate() {
       );
     `);
 
+    // ── contacts table ─────────────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id            SERIAL PRIMARY KEY,
+        first_name    TEXT NOT NULL,
+        last_name     TEXT NOT NULL,
+        zip           TEXT,
+        email         TEXT,
+        phone         TEXT,
+        membership_id INTEGER REFERENCES memberships(id) ON DELETE SET NULL,
+        notes         TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     // ── Column migrations (idempotent) ─────────────────────────────────────────
     const alterations = [
+      // Toast POS dedup / source tracking
       "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS external_id TEXT UNIQUE",
       "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'",
+      // Contact / corporate-event linking
+      "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL",
+      "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS event_id   INTEGER REFERENCES events(id) ON DELETE SET NULL",
+      // Member credit accounts
+      "ALTER TABLE memberships ADD COLUMN IF NOT EXISTS credit_limit REAL",
+      // Corporate-event flag on events
+      "ALTER TABLE events ADD COLUMN IF NOT EXISTS is_corporate_event SMALLINT NOT NULL DEFAULT 0",
+      // Walk-in contact linkage on check-in log
+      "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL",
     ];
     for (const sql of alterations) {
       await client.query(sql);

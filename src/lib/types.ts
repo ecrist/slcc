@@ -54,6 +54,7 @@ export interface GolfEvent {
   current_participants: number;
   cost: number | null;
   is_public: number;
+  is_corporate_event: number;
   image_url: string | null;
   created_at: string;
 }

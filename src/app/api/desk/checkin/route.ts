@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     clubs_requested = 0,
     personal_cart_drop = 0,
     membership_id,
+    contact_id,
     tee_time_id,
     notes,
   } = body;
@@ -32,13 +33,13 @@ export async function POST(request: NextRequest) {
   const { id } = await execute(
     `INSERT INTO checkins
        (type, name, email, players, holes, carts_requested, buggies_requested,
-        clubs_requested, personal_cart_drop, membership_id, tee_time_id, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        clubs_requested, personal_cart_drop, membership_id, contact_id, tee_time_id, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING id`,
     [
       type, name, email ?? null, players, holes,
       carts_requested, buggies_requested, clubs_requested, personal_cart_drop,
-      membership_id ?? null, tee_time_id ?? null, notes ?? null,
+      membership_id ?? null, contact_id ?? null, tee_time_id ?? null, notes ?? null,
     ]
   );
 

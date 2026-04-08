@@ -95,6 +95,11 @@ export default function DeskPage() {
     carts: "0", buggies: "0", clubs: "0", personal_cart_drop: false, notes: "",
   });
   const [walkInSubmitting, setWalkInSubmitting] = useState(false);
+  // Contact lookup for walk-in
+  const [contactQuery, setContactQuery] = useState("");
+  const [contactResults, setContactResults] = useState<{ id: number; first_name: string; last_name: string; zip: string | null }[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
+  const contactTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clock
   useEffect(() => {
@@ -288,6 +293,25 @@ export default function DeskPage() {
     }
   }
 
+  // ── Contact lookup for walk-in ────────────────────────────────────────────
+  function handleContactSearch(q: string) {
+    setContactQuery(q);
+    setSelectedContactId(null);
+    if (contactTimer.current) clearTimeout(contactTimer.current);
+    if (q.length < 2) { setContactResults([]); return; }
+    contactTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/desk/contact?q=${encodeURIComponent(q)}`);
+      setContactResults(res.ok ? await res.json() : []);
+    }, 200);
+  }
+
+  function selectContact(c: { id: number; first_name: string; last_name: string; zip: string | null }) {
+    setSelectedContactId(c.id);
+    setContactQuery(`${c.first_name} ${c.last_name}${c.zip ? ` (${c.zip})` : ""}`);
+    setContactResults([]);
+    if (!walkIn.name) setWalkIn((prev) => ({ ...prev, name: `${c.first_name} ${c.last_name}` }));
+  }
+
   // ── Walk-in ───────────────────────────────────────────────────────────────
   async function handleWalkIn(e: React.FormEvent) {
     e.preventDefault();
@@ -305,6 +329,7 @@ export default function DeskPage() {
         buggies_requested: parseInt(walkIn.buggies),
         clubs_requested: parseInt(walkIn.clubs),
         personal_cart_drop: walkIn.personal_cart_drop ? 1 : 0,
+        contact_id: selectedContactId ?? null,
         notes: walkIn.notes || null,
       }),
     });
@@ -312,6 +337,9 @@ export default function DeskPage() {
     if (res.ok) {
       flash(`${walkIn.name} checked in as walk-in`);
       setWalkIn({ name: "", email: "", players: "2", holes: "18", carts: "0", buggies: "0", clubs: "0", personal_cart_drop: false, notes: "" });
+      setContactQuery("");
+      setContactResults([]);
+      setSelectedContactId(null);
       fetchToday();
     } else {
       flash("Check-in failed", false);
@@ -625,6 +653,35 @@ export default function DeskPage() {
             {/* ── Walk-In Panel ─────────────────────────────────────── */}
             {panel === "walkin" && (
               <form onSubmit={handleWalkIn} className="p-5 space-y-4">
+                {/* Contact lookup */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Returning Guest?
+                    {selectedContactId && <span className="ml-2 text-green-400 text-xs">linked</span>}
+                  </label>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    placeholder="Search by name to link a contact record…"
+                    value={contactQuery}
+                    onChange={(e) => handleContactSearch(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                  {contactResults.length > 0 && (
+                    <div className="absolute z-10 left-0 right-0 bg-slate-700 border border-slate-600 rounded-xl mt-1 overflow-hidden shadow-xl">
+                      {contactResults.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => selectContact(c)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-slate-600 text-white text-sm border-b border-slate-600 last:border-0"
+                        >
+                          {c.first_name} {c.last_name}{c.zip ? <span className="text-slate-400 ml-1.5">({c.zip})</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-slate-300 mb-1">Name *</label>

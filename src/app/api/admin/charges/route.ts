@@ -27,8 +27,10 @@ export async function POST(request: NextRequest) {
   const { deny, email } = await requireAdmin();
   if (deny) return deny;
 
-  const { membership_id, member_name, member_email, charge_type, description, amount, notes } =
-    await request.json();
+  const {
+    membership_id, contact_id, event_id,
+    member_name, member_email, charge_type, description, amount, notes,
+  } = await request.json();
 
   if (!member_name || !description || !amount) {
     return NextResponse.json({ error: "Name, description, and amount are required" }, { status: 400 });
@@ -36,11 +38,14 @@ export async function POST(request: NextRequest) {
 
   const { id } = await execute(
     `INSERT INTO member_charges
-       (membership_id, member_name, member_email, charge_type, description, amount, notes, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       (membership_id, contact_id, event_id,
+        member_name, member_email, charge_type, description, amount, notes, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      RETURNING id`,
     [
       membership_id || null,
+      contact_id || null,
+      event_id || null,
       member_name,
       member_email || null,
       charge_type || "other",
