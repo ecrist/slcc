@@ -139,6 +139,22 @@ Changes take effect immediately without a server restart, except OAuth credentia
 
 ---
 
+## Offline Support
+
+The service worker (`public/sw.js`) caches key pages so staff can continue working without a connection:
+
+| Route | Offline behavior |
+|-------|-----------------|
+| `/desk` | Fully cached — works offline after first visit |
+| `/tee-times` | Readable offline (no new bookings) |
+| `/login` | Cached for credential entry |
+| `/offline` | Fallback for uncached navigation |
+| `/api/*` | Returns `{ error: "Offline" }` with 503 |
+
+Data-write operations (payments, new bookings) require an internet connection.
+
+---
+
 ## Desk / Counter Mode (`/desk`)
 
 Full-screen kiosk for the pro shop counter. Installable as a PWA on any device.
