@@ -1,0 +1,47 @@
+{
+  "name": "Swan Lake Country Club",
+  "short_name": "Swan Lake CC",
+  "description": "Member portal and staff counter for Swan Lake Country Club",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a3a2a",
+  "theme_color": "#2d6a4f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Staff Counter",
+      "short_name": "Desk",
+      "description": "Open the staff counter and check-in view",
+      "url": "/desk",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Book Tee Time",
+      "short_name": "Tee Times",
+      "url": "/tee-times",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Admin",
+      "short_name": "Admin",
+      "url": "/admin",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    }
+  ],
+  "categories": ["sports", "business"],
+  "prefer_related_applications": false
+}
