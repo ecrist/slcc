@@ -14,7 +14,8 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 | Database | SQLite via `better-sqlite3` (WAL mode) |
 | Auth | NextAuth.js v5 — credentials, Google OAuth, Apple Sign In |
 | Email | Nodemailer (SMTP) |
-| Payments | Square SDK + Web Payments SDK; QuickBooks Payments |
+| Payments | Square SDK + Web Payments SDK; QuickBooks Payments (ACH/invoice) |
+| POS Webhooks | Square + Toast webhook endpoints (stubs — not yet implemented) |
 | Process manager | PM2 |
 | Web server | nginx |
 
