@@ -4,6 +4,7 @@ import { getConfigValue } from "@/lib/admin";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import { sendTeeTimeConfirmation } from "@/lib/email";
+import { sunsetTime, subtractHours } from "@/lib/sunset";
 
 async function getEquipmentAvailability(date: string) {
   const cartFeePerNine    = parseFloat((await getConfigValue("cart_fee_per_9"))         ?? "10");
@@ -54,13 +55,70 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Date parameter required" }, { status: 400 });
   }
 
+  const [
+    seasonStart, seasonEnd,
+    teeTimeOpen, teeTimeClose,
+    clubhouseOpen, clubhouseClose,
+    sunsetEnabled, sunsetCutoffHours,
+    latStr, lngStr,
+  ] = await Promise.all([
+    getConfigValue("season_start"),
+    getConfigValue("season_end"),
+    getConfigValue("tee_time_open"),
+    getConfigValue("tee_time_close"),
+    getConfigValue("clubhouse_open"),
+    getConfigValue("clubhouse_close"),
+    getConfigValue("sunset_cutoff_enabled"),
+    getConfigValue("sunset_cutoff_hours"),
+    getConfigValue("course_latitude"),
+    getConfigValue("course_longitude"),
+  ]);
+
+  // Compute effective last tee time — sunset cutoff overrides tee_time_close when enabled
+  let effectiveTeeTimeClose = teeTimeClose;
+  let sunsetStr: string | null = null;
+  if (sunsetEnabled === "true") {
+    const lat = parseFloat(latStr ?? "47.72");
+    const lng = parseFloat(lngStr ?? "-93.01");
+    const cutoff = parseFloat(sunsetCutoffHours ?? "2");
+    // Pengilly MN is UTC-6 (CST) / UTC-5 (CDT); approximate with -5 (CDT, May–Oct season)
+    const utcOffset = -5;
+    sunsetStr = sunsetTime(date, lat, lng, utcOffset);
+    if (sunsetStr) {
+      const cutoffTime = subtractHours(sunsetStr, cutoff);
+      // Only apply if it's earlier than the configured close time (or if none set)
+      if (!effectiveTeeTimeClose || cutoffTime < effectiveTeeTimeClose) {
+        effectiveTeeTimeClose = cutoffTime;
+      }
+    }
+  }
+
+  // Private events block tee time bookings during their window
+  const privateEvents = await query<{ start_time: string | null; end_time: string | null; title: string }>(
+    "SELECT start_time, end_time, title FROM events WHERE event_date = $1 AND is_public = 0",
+    [date]
+  );
+
   const bookedSlots = await query(
     "SELECT time, players, player_name, group_booking_id, slot_index FROM tee_times WHERE date = $1 AND status != 'cancelled' ORDER BY time",
     [date]
   );
   const equipment = await getEquipmentAvailability(date);
 
-  return NextResponse.json({ bookedSlots, equipment });
+  return NextResponse.json({
+    bookedSlots,
+    equipment,
+    seasonStart,
+    seasonEnd,
+    teeTimeOpen,
+    teeTimeClose: effectiveTeeTimeClose,
+    teeTimeCloseRaw: teeTimeClose,
+    clubhouseOpen,
+    clubhouseClose,
+    sunsetTime: sunsetStr,
+    sunsetCutoffEnabled: sunsetEnabled === "true",
+    privateEvents,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -72,6 +130,67 @@ export async function POST(request: NextRequest) {
 
   if (!date || !time || !player_name) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const [
+    seasonStart, seasonEnd,
+    teeTimeClose, sunsetEnabled, sunsetCutoffHours, latStr, lngStr,
+  ] = await Promise.all([
+    getConfigValue("season_start"),
+    getConfigValue("season_end"),
+    getConfigValue("tee_time_close"),
+    getConfigValue("sunset_cutoff_enabled"),
+    getConfigValue("sunset_cutoff_hours"),
+    getConfigValue("course_latitude"),
+    getConfigValue("course_longitude"),
+  ]);
+
+  // season_start / season_end are stored as MM-DD; compare against the month-day of the requested date
+  const monthDay = date.slice(5); // "YYYY-MM-DD" → "MM-DD"
+  if (seasonStart && monthDay < seasonStart) {
+    return NextResponse.json({ error: `The course season begins on ${seasonStart}. Bookings are not available before that date.` }, { status: 400 });
+  }
+  if (seasonEnd && monthDay > seasonEnd) {
+    return NextResponse.json({ error: `The course season ended on ${seasonEnd}. Bookings are not available after that date.` }, { status: 400 });
+  }
+
+  // Enforce sunset cutoff
+  let effectiveTeeTimeClose = teeTimeClose;
+  if (sunsetEnabled === "true") {
+    const lat = parseFloat(latStr ?? "47.72");
+    const lng = parseFloat(lngStr ?? "-93.01");
+    const cutoff = parseFloat(sunsetCutoffHours ?? "2");
+    const sunset = sunsetTime(date, lat, lng, -5);
+    if (sunset) {
+      const cutoffTime = subtractHours(sunset, cutoff);
+      if (!effectiveTeeTimeClose || cutoffTime < effectiveTeeTimeClose) {
+        effectiveTeeTimeClose = cutoffTime;
+      }
+    }
+  }
+  if (effectiveTeeTimeClose && time > effectiveTeeTimeClose) {
+    return NextResponse.json({ error: `Bookings are not available after ${effectiveTeeTimeClose} on this date.` }, { status: 400 });
+  }
+
+  // Block bookings that fall within a private event window
+  const privateEvents = await query<{ start_time: string | null; end_time: string | null; title: string }>(
+    "SELECT start_time, end_time, title FROM events WHERE event_date = $1 AND is_public = 0",
+    [date]
+  );
+  for (const evt of privateEvents) {
+    const start = evt.start_time;
+    const end = evt.end_time;
+    const blocked =
+      !start && !end ? true                          // whole day
+      : !start ? time <= end!                        // up to end
+      : !end   ? time >= start                       // from start onward
+      : time >= start && time <= end;                // within window
+    if (blocked) {
+      return NextResponse.json(
+        { error: `This time is unavailable due to a private event${evt.title ? ` (${evt.title})` : ""}.` },
+        { status: 409 }
+      );
+    }
   }
 
   const playerCount  = Math.max(1, Math.min(12, parseInt(players) || 1));

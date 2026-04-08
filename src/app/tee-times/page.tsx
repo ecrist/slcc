@@ -57,6 +57,15 @@ export default function TeeTimesPage() {
     personal_cart_drop: false,
     notes: "",
   });
+  const [seasonStart, setSeasonStart] = useState<string | null>(null);
+  const [seasonEnd, setSeasonEnd] = useState<string | null>(null);
+  const [teeTimeOpen, setTeeTimeOpen] = useState<string | null>(null);
+  const [teeTimeClose, setTeeTimeClose] = useState<string | null>(null);
+  const [clubhouseOpen, setClubhouseOpen] = useState<string | null>(null);
+  const [clubhouseClose, setClubhouseClose] = useState<string | null>(null);
+  const [sunsetTimeVal, setSunsetTimeVal] = useState<string | null>(null);
+  const [sunsetCutoffEnabled, setSunsetCutoffEnabled] = useState(false);
+  const [privateEvents, setPrivateEvents] = useState<{ start_time: string | null; end_time: string | null; title: string }[]>([]);
   const [submitStatus, setSubmitStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -101,6 +110,15 @@ export default function TeeTimesPage() {
       const data = await res.json();
       setBookedSlots(data.bookedSlots ?? []);
       setEquipment(data.equipment ?? null);
+      setSeasonStart(data.seasonStart ?? null);
+      setSeasonEnd(data.seasonEnd ?? null);
+      setTeeTimeOpen(data.teeTimeOpen ?? null);
+      setTeeTimeClose(data.teeTimeClose ?? null);
+      setClubhouseOpen(data.clubhouseOpen ?? null);
+      setClubhouseClose(data.clubhouseClose ?? null);
+      setSunsetTimeVal(data.sunsetTime ?? null);
+      setSunsetCutoffEnabled(data.sunsetCutoffEnabled ?? false);
+      setPrivateEvents(data.privateEvents ?? []);
     } catch {
       console.error("Failed to fetch tee times");
     } finally {
@@ -150,6 +168,48 @@ export default function TeeTimesPage() {
       setSubmitting(false);
     }
   }
+
+  function isOutOfSeason(date: string): boolean {
+    const md = date.slice(5); // MM-DD
+    if (seasonStart && md < seasonStart) return true;
+    if (seasonEnd && md > seasonEnd) return true;
+    return false;
+  }
+
+  function seasonMessage(date: string): string | null {
+    const md = date.slice(5);
+    if (seasonStart && md < seasonStart) return `Course season opens ${seasonStart}. Bookings are not available for this date.`;
+    if (seasonEnd && md > seasonEnd) return `Course season closed ${seasonEnd}. Bookings are not available for this date.`;
+    return null;
+  }
+
+  function fmt12h(time: string): string {
+    const [h, m] = time.split(":");
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${display}:${m} ${ampm}`;
+  }
+
+  function privateEventBlockingSlot(time: string): string | null {
+    for (const evt of privateEvents) {
+      const { start_time: start, end_time: end } = evt;
+      const blocked =
+        !start && !end ? true
+        : !start ? time <= end!
+        : !end   ? time >= start
+        : time >= start && time <= end;
+      if (blocked) return evt.title || "Private Event";
+    }
+    return null;
+  }
+
+  // Filter slots to the configured tee time window
+  const visibleSlots = TEE_TIME_SLOTS.filter((t) => {
+    if (teeTimeOpen && t < teeTimeOpen) return false;
+    if (teeTimeClose && t > teeTimeClose) return false;
+    return true;
+  });
 
   const dateOptions = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -244,14 +304,29 @@ export default function TeeTimesPage() {
         </div>
       </div>
 
-      {/* Equipment availability */}
-      {equipment && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <AvailBadge available={equipment.cartsAvailable} total={equipment.cartTotal} label="Golf carts" />
-          <AvailBadge available={equipment.buggiesAvailable} total={equipment.buggyTotal} label="Walking buggies" />
-          <AvailBadge available={equipment.clubsAvailable} total={equipment.clubsTotal} label="Club rentals" />
-        </div>
-      )}
+      {/* Hours & equipment availability */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {(clubhouseOpen || clubhouseClose) && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-50 text-blue-800 border-blue-200">
+            Clubhouse: {clubhouseOpen ? fmt12h(clubhouseOpen) : "—"} – {clubhouseClose ? fmt12h(clubhouseClose) : "—"}
+          </div>
+        )}
+        {(teeTimeOpen || teeTimeClose) && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border bg-green-50 text-green-800 border-green-200">
+            Tee times: {teeTimeOpen ? fmt12h(teeTimeOpen) : "—"} – {teeTimeClose ? fmt12h(teeTimeClose) : "—"}
+            {sunsetCutoffEnabled && sunsetTimeVal && (
+              <span className="text-green-600">(sunset {fmt12h(sunsetTimeVal)})</span>
+            )}
+          </div>
+        )}
+        {equipment && (
+          <>
+            <AvailBadge available={equipment.cartsAvailable} total={equipment.cartTotal} label="Golf carts" />
+            <AvailBadge available={equipment.buggiesAvailable} total={equipment.buggyTotal} label="Walking buggies" />
+            <AvailBadge available={equipment.clubsAvailable} total={equipment.clubsTotal} label="Club rentals" />
+          </>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Time Slots */}
@@ -265,22 +340,32 @@ export default function TeeTimesPage() {
             )}
           </div>
 
+          {seasonMessage(selectedDate) && (
+            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-300 text-sm text-amber-900">
+              {seasonMessage(selectedDate)}
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-12 text-gray-500">Loading available times...</div>
-          ) : (
+          ) : isOutOfSeason(selectedDate) ? null : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {TEE_TIME_SLOTS.map((time) => {
+              {visibleSlots.map((time) => {
                 const isBooked = bookedTimes.has(time);
+                const privateBlock = privateEventBlockingSlot(time);
                 const group = getSlotGroup(time, slotsNeeded);
                 const isUnavailable =
                   isBooked ||
+                  !!privateBlock ||
                   group.length < slotsNeeded ||
-                  group.some((t) => bookedTimes.has(t));
+                  group.some((t) => bookedTimes.has(t) || !!privateEventBlockingSlot(t));
                 const isSelectedStart = bookingSlot === time;
                 const isInSelectedGroup = !isSelectedStart && selectedGroup.includes(time);
 
                 let className = "p-3 rounded-lg text-center font-medium transition-all text-sm ";
-                if (isUnavailable) {
+                if (privateBlock) {
+                  className += "bg-purple-50 text-purple-400 cursor-not-allowed";
+                } else if (isUnavailable) {
                   className += "bg-gray-100 text-gray-400 cursor-not-allowed";
                   if (isBooked) className += " line-through";
                 } else if (isSelectedStart) {
@@ -297,9 +382,11 @@ export default function TeeTimesPage() {
                     disabled={isUnavailable}
                     onClick={() => setBookingSlot(isSelectedStart ? null : time)}
                     className={className}
+                    title={privateBlock ? `Unavailable: ${privateBlock}` : undefined}
                   >
                     {formatTime(time)}
-                    {isBooked && <span className="block text-xs mt-0.5">Booked</span>}
+                    {privateBlock && <span className="block text-xs mt-0.5">Private Event</span>}
+                    {!privateBlock && isBooked && <span className="block text-xs mt-0.5">Booked</span>}
                     {isInSelectedGroup && <span className="block text-xs mt-0.5">Also reserved</span>}
                   </button>
                 );
@@ -315,6 +402,10 @@ export default function TeeTimesPage() {
             <span className="flex items-center gap-1.5">
               <span className="w-4 h-4 rounded bg-swan-gold inline-block" />
               Selected start
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-4 rounded bg-purple-50 border border-purple-200 inline-block" />
+              Private event
             </span>
             {slotsNeeded > 1 && (
               <span className="flex items-center gap-1.5">

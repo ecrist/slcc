@@ -1,333 +1,166 @@
-# Swan Lake Country Club
+# Swan Lake Country Club — Online Services Portal
 
-A full-featured club management web application for Swan Lake CC — handling tee time bookings, memberships, billing, counter operations, and POS integration.
-
----
-
-## Feature Overview
-
-| Area | Features |
-|------|----------|
-| **Public Site** | Tee time booking, membership signup, equipment rental, anonymous payments |
-| **Admin Panel** | Tee sheet management, member roster, billing, renewals, config |
-| **Counter / Desk** | PWA-installable kiosk mode, NFC member check-in, screen wake lock |
-| **Billing** | Bar tabs, cart storage, invoices, custom charges, POS auto-import |
-| **POS Integration** | Square and Toast webhook receivers for automatic charge creation |
-| **PWA** | Installable on iOS and Android, service worker, offline support |
+Online booking, membership, billing, and club management portal for [Swan Lake Country Club](https://www.swanlakecc.com) in Pengilly, Minnesota. Designed to run on a subdomain such as `book.swanlakecc.com`.
 
 ---
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router, React Server Components)
-- **Database**: PostgreSQL (Neon serverless) via `pg` pool
-- **Auth**: NextAuth v5 (credentials + OAuth), JWT sessions with isAdmin claim
-- **Styling**: Tailwind CSS with custom Swan Lake theme colors
-- **Deployment**: Render (web service), auto-deploy on push to `main`
-- **PWA**: Web App Manifest + Service Worker (`public/sw.js`)
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS (custom Swan Lake theme) |
+| Database | SQLite via `better-sqlite3` (WAL mode) |
+| Auth | NextAuth.js v5 — credentials, Google OAuth, Apple Sign In |
+| Email | Nodemailer (SMTP) |
+| Payments | Square SDK + Web Payments SDK; QuickBooks Payments |
+| Process manager | PM2 |
+| Web server | nginx |
 
 ---
 
-## Public Site
+## Features
 
 ### Tee Time Booking (`/tee-times`)
 
-Members and guests can book tee times without logging in.
+- Browse available times for any date within the configured booking window
+- 12-minute slots from first to last tee time (configurable)
+- Party sizes 1–12; large parties automatically reserve 2–3 consecutive slots
+- Concurrency-safe: `BEGIN IMMEDIATE` transaction + unique partial index prevent double-booking
+- Optional equipment rental per booking: power carts, walking buggies, club sets, personal cart drop
 
-- Select date, time slot, number of players, holes (9 or 18)
-- Optional equipment rental (pull cart, power cart, clubs)
-- Payment collected at time of booking via Stripe
-- Confirmation email sent automatically
-- Walk-ins can be added by admin without an email address
+**Availability rules (all configurable in Admin → Settings):**
 
-### Membership Signup (`/join`)
+| Rule | Config key | Default |
+|------|-----------|---------|
+| Season open date | `season_start` (MM-DD) | `05-01` |
+| Season close date | `season_end` (MM-DD) | `10-31` |
+| First tee time | `tee_time_open` | `07:00` |
+| Last tee time | `tee_time_close` | `17:48` |
+| Sunset cutoff | `sunset_cutoff_enabled` | `true` |
+| Hours before sunset | `sunset_cutoff_hours` | `2` |
+| Course coordinates | `course_latitude` / `course_longitude` | Pengilly, MN |
 
-- Choose membership type (Individual, Family, Senior, Junior, Corporate)
-- Collect member info, emergency contact, payment
-- Membership record created with `payment_status = 'pending'`
-- Admin marks as paid on the Billing page
+The sunset cutoff uses a pure astronomical calculation (no API key) — the last available slot updates daily based on the actual sunset time for the configured coordinates. It only applies if it falls *earlier* than `tee_time_close`, so special events like twilight golf can be enabled by toggling `sunset_cutoff_enabled` off or extending `tee_time_close`.
+
+**Private event blocking:** any event marked as Private in Admin → Events blocks online tee time bookings during the event's time window on that date. Affected slots show as "Private Event" in purple on the booking grid.
+
+### Memberships (`/memberships`)
+
+Six tiers matching current Swan Lake CC pricing:
+
+| Tier | Price |
+|------|-------|
+| Junior Summer Pass (18 and under) | $100 |
+| Young Adult (19–29) | $445 |
+| Single | $740 *(+ $100 gift card for new members)* |
+| Household | $962.50 *(+ $100 gift card for new members)* |
+| Driving Range Pass – Single | $80 |
+| Driving Range Pass – Household | $125 |
+
+Payment options: Google Pay, Apple Pay, credit/debit card (Square), or invoice/ACH (QuickBooks).
+
+Members can opt in to **auto-renewal** at checkout — card is tokenized via Square Card on File, never stored raw.
+
+### Tournaments (`/tournaments`)
+
+Six formats:
+
+- **Luck of the Draw** — individual entry, admin runs blind random draw to form teams
+- **Scramble** — captain's choice; same draw algorithm
+- **Best Ball** — team play; draw assigns teams
+- **Stroke Play** — individual gross/net scoring
+- **Stableford** — individual points scoring
+- **Match Play** — head-to-head
+
+Admin tools: run/re-run draw, bulk-assign tee times to teams, inline score entry, auto-ranked leaderboard. Leftover players distributed evenly rather than leaving an undersized team.
+
+### Events (`/events`)
+
+- Public events calendar with type filtering (tournament, league, clinic, social)
+- Online registration with party size and real-time spot tracking
+- **Private events** — hidden from public calendar; blocks tee time booking during event hours
+
+### Transactional Email
+
+Automatic confirmations sent via SMTP (Nodemailer) for:
+
+- Tee time bookings
+- Membership purchases
+- Tournament registrations
+- Membership renewal reminders
+
+Configured in Admin → Settings. Silently skips if `smtp_host` is not set.
+
+### Recurring Membership Billing (`/admin/billing`)
+
+- Lists memberships expiring within 30 days
+- Shows which have a card on file ("auto-renewal ready") vs. not
+- Bulk select → charge saved cards and create new membership record for next season
+- "Send Renewal Reminders" emails members without a card on file
+- Cron-safe: `POST /api/admin/billing/renew?secret=CRON_SECRET` for automated scheduling
 
 ---
 
 ## Admin Panel (`/admin`)
 
-Access requires an admin account. The **Admin** link appears in the navigation header for admin users only.
+| Section | Description |
+|---------|-------------|
+| **Tee Sheet** | Visual day view — all 55 slots, color-coded by status, click to check in or cancel |
+| **Bookings** | Tabular list of all tee time reservations, filter by date |
+| **Memberships** | Full member roster, payment status, NFC card management |
+| **Billing** | Bulk renewal processing, manual charges, renewal reminders |
+| **Tournaments** | Create events, manage entries, run draws, assign tee times, enter scores |
+| **Events** | Create/edit/delete events; toggle Public ↔ Private with one click |
+| **Equipment** | Full inventory with make, model, year, serial, color, seats, fuel type, battery year, hours, last service |
+| **Settings** | All site configuration in the database — no rebuild required |
 
-### Tee Sheet (`/admin/tee-sheet`)
+### Tee Sheet
 
-Visual tee sheet showing all time slots for the selected date.
+- Color-coded: open (gray), booked (gold), checked-in (teal), multi-slot group (purple), cancelled (red), private event (purple badge)
+- Click any booked slot: name, contact, players, holes, equipment, notes
+- Check in, edit, or cancel directly from the panel
+- Date navigation with prev/next and date picker
 
-- **Click an open slot** — add a walk-in booking (name, phone, players, holes, notes; email optional)
-- **Click a booked slot** — view booking details with three actions:
-  - **Check In** — marks the player as arrived
-  - **Edit** — modify any booking detail inline
-  - **Cancel** — removes the booking
-- Date navigation to view any day
-- Color-coded slots: open, booked (gold), checked-in (green)
+### Settings (`/admin/settings`)
 
-### Members (`/admin/members`)
+All configuration is stored in the database. Sections:
 
-- Full member roster with search
-- View membership details, expiry dates, payment status
-- Filter by membership type or status
+- **Course Operation** — open/closed, booking window, green fees, cart fees, season dates, tee time hours, clubhouse hours, sunset cutoff, course coordinates
+- **Email (SMTP)** — host, port, credentials, from address
+- **Square Payments** — access token, app ID, location ID, environment
+- **QuickBooks Payments** — client credentials, redirect URI, environment
+- **Google Sign In** — OAuth client ID and secret
+- **Apple Sign In** — Services ID and private key
+- **Security** — cron secret for billing automation
 
-### Billing (`/admin/billing`)
-
-Three-tab billing dashboard:
-
-#### Tab 1: Charges & Tabs
-
-- View all open charges (bar tabs, cart storage, invoices, other)
-- **Add Charge** button opens a form:
-  - Member name (required), email, membership ID (optional — for walk-in customers)
-  - Charge type: bar tab, cart storage, invoice, other
-  - Description, amount, internal notes
-- Per-row actions: **Mark Paid** / **Void**
-- Toggle to show All charges vs. Open only
-
-#### Tab 2: Pending Payments
-
-- Memberships awaiting payment (`payment_status = 'pending'`)
-- **Mark Paid** button per row to confirm receipt
-
-#### Tab 3: Renewals Due
-
-- Members expiring within 60 days
-- Bulk select to charge renewal fees or send reminder emails
-- Per-row charge or email actions
-
-### Config (`/admin/config`)
-
-Site-wide configuration stored in the database — no rebuild required when settings change:
-
-- Club name, address, phone, email
-- Tee time interval, first/last tee time, advance booking window
-- Cart storage fee amount, rental prices
-- POS system selection (Square / Toast / None)
-- Square webhook key, Toast webhook secret
+Changes take effect immediately without a server restart, except OAuth credentials (Google/Apple) which require a restart.
 
 ---
 
 ## Desk / Counter Mode (`/desk`)
 
-A full-screen kiosk application designed for staff at the pro shop counter.
+Full-screen kiosk for the pro shop counter. Installable as a PWA on any device.
 
-### Features
+- **Screen Wake Lock** — display stays on while open
+- **NFC Member Check-In** — tap card/fob to look up member and check in to tee time
+- **Member Search** — manual lookup by name or member number
 
-- **Screen Wake Lock** — display stays on automatically while desk view is open; re-acquired on tab focus
-- **NFC Member Check-In** — tap NFC card or fob to look up member and check them in to their tee time
-- **Member Search** — manual name or member number lookup
-- **Quick Actions** — add charges, check booking status
-
-### PWA Installation
-
-The app is installable as a native app on any device:
-
-**iOS (iPhone/iPad)**:
-1. Open the site in Safari
-2. Tap the Share button (box with arrow)
-3. Choose "Add to Home Screen"
-4. Launch from home screen — runs full-screen with no browser chrome
-
-**Android (Chrome)**:
-1. Open the site in Chrome
-2. An install banner appears after 30 seconds — tap Install
-3. Or use the browser menu → "Add to Home Screen"
-
-**Desktop (Chrome/Edge)**:
-- An install icon appears in the address bar
-
-Once installed, app shortcuts provide direct access to:
-- Staff Counter (`/desk`)
-- Book Tee Time (`/tee-times`)
-- Admin Panel (`/admin`)
-
----
-
-## Billing & Charges
-
-### Charge Types
-
-| Type | Description |
-|------|-------------|
-| `bar_tab` | Food and beverage charges from the clubhouse bar |
-| `cart_storage` | Monthly or annual cart storage fees |
-| `invoice` | General invoices for services or events |
-| `other` | Miscellaneous charges |
-
-### Charge Lifecycle
-
-1. **Created** — manually via Admin → Billing, or automatically via POS webhook
-2. **Open** — default status, visible on the Charges tab
-3. **Paid** — marked by staff; `paid_at` timestamp recorded
-4. **Voided** — cancelled without payment
-
-Charges can be linked to a member account (`membership_id`) or created standalone for walk-in customers.
-
----
-
-## POS Integration
-
-Charges are created automatically when sales close at the point-of-sale system.
-
-### Square Integration
-
-1. In Admin → Config, set **POS System** to Square and paste your **Square Webhook Signature Key**
-2. In your Square Dashboard, add a webhook pointing to:
-   `https://your-domain.com/api/webhooks/square`
-3. Subscribe to: `payment.completed`, `order.created`, `order.updated`
-
-**Behavior**:
-- When a payment completes with member metadata in the order, a `bar_tab` charge is created automatically
-- If the order ID matches an existing open charge in notes, that charge is marked paid
-
-### Toast Integration
-
-1. In Admin → Config, set **POS System** to Toast and paste your **Toast Webhook Secret**
-2. In Toast Partner Portal, point webhooks to:
-   `https://your-domain.com/api/webhooks/toast`
-3. Subscribe to: `CHECK_CLOSED`, `ORDER_CLOSED`
-
-**Behavior**:
-- When a check closes, the member name on the tab is used to look up their account
-- A `bar_tab` charge is created with the check total
-- Duplicate checks (same Toast GUID) are ignored automatically
-
-### Adding Other POS Systems
-
-The webhook architecture is extensible. Any POS that can send HMAC-signed HTTP POST events can be integrated by adding a route under `src/app/api/webhooks/`.
-
----
-
-## Database Schema
-
-Key tables:
-
-| Table | Purpose |
-|-------|---------|
-| `memberships` | Member records, type, status, expiry, payment_status |
-| `tee_times` | Booked slots, player info, check-in status |
-| `member_charges` | Bar tabs, cart fees, invoices; linked to membership or standalone |
-| `site_config` | Key/value store for all admin-configurable settings |
-| `tournaments` | Tournament definitions and registration |
-| `events` | Club events and announcements |
-
-### member_charges table
-
-```sql
-id              SERIAL PRIMARY KEY
-membership_id   INTEGER REFERENCES memberships(id)  -- nullable for walk-ins
-member_name     TEXT NOT NULL
-member_email    TEXT
-charge_type     TEXT   -- 'bar_tab' | 'cart_storage' | 'invoice' | 'other'
-description     TEXT NOT NULL
-amount          REAL NOT NULL
-status          TEXT   -- 'open' | 'paid' | 'voided'
-notes           TEXT
-created_by      TEXT   -- admin email who created the charge
-paid_at         TIMESTAMPTZ
-created_at      TIMESTAMPTZ DEFAULT NOW()
-```
-
----
-
-## Membership Types
-
-| Type | Description |
-|------|-------------|
-| Individual | Single adult member |
-| Family | Member + spouse/partner + dependents under 25 |
-| Senior | 65+ individual |
-| Junior | Under 25 |
-| Corporate | Business membership with multiple named players |
-
-Status values: `active`, `pending`, `expired`, `cancelled`
+**PWA installation:** iOS → Safari Share → Add to Home Screen. Android/Desktop → Chrome install prompt or address bar icon.
 
 ---
 
 ## Environment Variables
 
+Only two variables are required in `.env.local`:
+
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (`postgresql://user:pass@host/db`) |
-| `AUTH_SECRET` | Random 32-byte base64 string for session signing |
-| `NEXTAUTH_URL` | Full URL of your deployment (e.g. `https://your-app.onrender.com`) |
-| `AUTH_TRUST_HOST` | Set to `true` when behind a reverse proxy (required on Render) |
-| `STRIPE_SECRET_KEY` | Stripe secret key for payment processing |
-| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (used in browser) |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `SENDGRID_API_KEY` | SendGrid key for transactional email |
-| `FROM_EMAIL` | Sender address (e.g. `noreply@swanlakecc.com`) |
-| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Square webhook HMAC key (if using Square POS) |
-| `TOAST_WEBHOOK_SECRET` | Toast webhook HMAC secret (if using Toast POS) |
+| `AUTH_SECRET` | Random secret for signing session tokens. Generate: `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Full URL of the app, e.g. `https://book.swanlakecc.com` |
 
-Generate `AUTH_SECRET`:
-```bash
-openssl rand -base64 32
-```
-
----
-
-## Deployment (Render + Neon)
-
-### Database — Neon
-
-1. Create a free project at [neon.tech](https://neon.tech)
-2. Copy the connection string (Settings → Connection string)
-3. Set `DATABASE_URL` in your Render environment variables
-
-### Web Service — Render
-
-The `render.yaml` file configures the service automatically. On first deploy:
-
-1. Push this repo to GitHub
-2. On Render, create a **New Web Service** and connect your GitHub repo
-3. Render detects `render.yaml` and pre-fills the configuration
-4. Add all environment variables in Render → Environment
-5. Click **Deploy**
-
-**Build command** (set in Render Settings):
-```
-npm install --legacy-peer-deps && npm run db:migrate && npm run build
-```
-
-**Start command**:
-```
-npm run start
-```
-
-> Build time is approximately 5–7 minutes (npm install + migration + Next.js build). After the first deploy, npm install is cached and significantly faster.
-
-Subsequent deploys happen automatically on every push to `main`.
-
-### First Admin Account
-
-After deployment:
-
-1. Sign in or register with your email at `/login`
-2. Open the Neon SQL Editor and run:
-   ```sql
-   INSERT INTO admin_emails (email) VALUES ('your@email.com');
-   ```
-3. Sign out and sign back in — the **Admin** link appears in the header
-
----
-
-## Configuration Reference
-
-All settings in Admin → Config are stored in `site_config` as key/value pairs.
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `club_name` | Swan Lake CC | Display name used throughout the site |
-| `tee_time_interval` | 10 | Minutes between tee times |
-| `first_tee_time` | 07:00 | Opening tee time |
-| `last_tee_time` | 17:00 | Last available tee time |
-| `advance_booking_days` | 7 | Days ahead members can book |
-| `cart_storage_fee` | 250 | Annual cart storage fee ($) |
-| `pos_system` | none | `square`, `toast`, or `none` |
-| `square_webhook_key` | — | Square HMAC signature key |
-| `toast_webhook_secret` | — | Toast HMAC secret |
+All other configuration (SMTP, Square, QuickBooks, Google/Apple OAuth, fees, hours) is managed through Admin → Settings.
 
 ---
 
@@ -337,18 +170,39 @@ All settings in Admin → Config are stored in `site_config` as key/value pairs.
 # Install dependencies
 npm install --legacy-peer-deps
 
-# Copy env template
-cp .env.example .env.local
-# Edit .env.local: at minimum set DATABASE_URL and AUTH_SECRET
+# Copy env template and set AUTH_SECRET + NEXTAUTH_URL
+cp .env.local.example .env.local
 
-# Run database migrations
-npm run db:migrate
+# Seed development database (creates swan-lake.db with sample data)
+npm run db:setup
 
 # Start development server
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+**Default admin account:** `admin@swanlakecc.com` / `admin`
+Log in, add your own email as an admin at `/admin/settings`, then remove the default account.
+
+---
+
+## Production Deployment (PM2 + nginx)
+
+```bash
+# Build
+npm run build
+
+# Start with PM2
+pm2 start npm --name swan-lake -- start
+pm2 save
+pm2 startup
+
+# nginx proxy to port 3000
+# SSL via Let's Encrypt / certbot
+```
+
+The SQLite database file (`swan-lake.db`) lives in the project root. Back it up regularly — WAL mode is enabled for safe concurrent reads.
 
 ---
 
@@ -357,42 +211,62 @@ Open [http://localhost:3000](http://localhost:3000).
 ```
 src/
   app/
-    (public)/              # Public-facing pages (tee times, memberships, events)
-    admin/                 # Admin panel — server-side auth guard on layout
-      tee-sheet/           # Visual tee sheet with booking/edit/cancel
-      billing/             # Charges, pending payments, renewals
-      members/             # Member roster
-      config/              # Site configuration
-    desk/                  # Counter/kiosk mode (full-screen, wake lock)
-    offline/               # PWA offline fallback page
+    page.tsx                    # Homepage
+    tee-times/page.tsx          # Public booking grid
+    memberships/page.tsx        # Membership tiers + checkout
+    tournaments/                # Public tournament list + detail
+    events/page.tsx             # Public events calendar
+    login/page.tsx              # Sign in (credentials + OAuth)
+    register/page.tsx           # Account creation
+    admin/
+      layout.tsx                # Server auth guard
+      page.tsx                  # Dashboard stats
+      tee-sheet/page.tsx        # Visual tee sheet
+      tee-times/page.tsx        # Bookings table
+      memberships/page.tsx      # Member roster + NFC
+      billing/page.tsx          # Billing dashboard
+      tournaments/              # Tournament management
+      events/page.tsx           # Event management
+      equipment/page.tsx        # Equipment inventory
+      settings/page.tsx         # Site configuration
+    desk/                       # Counter/kiosk mode
     api/
-      admin/               # Admin-only REST endpoints
-        charges/           # GET/POST charges; PATCH [id] for status
-        tee-times/         # Edit and cancel bookings
-        memberships/       # Mark memberships paid
-        config/            # Read/write site_config
-      webhooks/
-        square/            # Square POS event receiver
-        toast/             # Toast POS event receiver
-      tee-times/           # Public tee time booking
-      memberships/         # Public membership signup
+      tee-times/route.ts        # Public booking API (season + sunset enforced)
+      memberships/route.ts      # Membership purchase
+      tournaments/              # Public tournament endpoints
+      events/route.ts           # Public events
+      config/public/route.ts    # Non-sensitive Square config for browser
+      admin/
+        tee-sheet/              # Admin tee sheet data
+        tee-times/              # Edit/cancel bookings
+        memberships/            # NFC management
+        billing/renew/          # Renewal processing + cron endpoint
+        tournaments/            # Draw, scores, tee time assignment
+        events/                 # Admin event CRUD (all events incl. private)
+        equipment/              # Equipment CRUD
+        settings/               # site_config read/write
+        users/                  # Admin user management
+      payments/
+        square/                 # Hosted checkout + Web Payments token processing
+        square/process/         # Card-on-file + save card
+        quickbooks/             # QuickBooks invoice
+      desk/                     # Desk/kiosk APIs
   components/
-    Header.tsx             # Nav with Admin link (admin-only)
-    PwaProvider.tsx        # Service worker registration + install prompt
-    WakeLock.tsx           # Screen Wake Lock API wrapper
+    Header.tsx
+    Footer.tsx
+    SquareWalletButtons.tsx     # Google Pay / Apple Pay (fetches config at runtime)
   lib/
     db/
-      index.ts             # pg pool + query/queryOne/execute/withTransaction
-      migrate.ts           # Schema migrations (run on deploy)
-    admin.ts               # isAdminEmail() DB lookup
-    email.ts               # SendGrid transactional email
-  auth.ts                  # NextAuth config: jwt callback stores isAdmin
-  auth.config.ts           # trustHost: true for Render proxy
-  types/next-auth.d.ts     # Session type extension (isAdmin field)
-public/
-  manifest.json            # PWA manifest (standalone, shortcuts)
-  sw.js                    # Service worker (cache strategies, offline fallback)
-  icons/                   # SVG app icons (standard + maskable)
+      index.ts                  # SQLite connection, schema, migrations, config seeding
+      setup.ts                  # Dev seed script
+    admin.ts                    # isAdminEmail(), getConfigValue()
+    email.ts                    # SMTP transactional email
+    sunset.ts                   # Astronomical sunset calculation (no API key)
+    square/client.ts            # Square client (reads credentials from DB)
+    types.ts                    # Shared types, MEMBERSHIP_TYPES, TEE_TIME_SLOTS
+  auth.ts                       # NextAuth config (Node.js — DB-backed providers)
+  auth.config.ts                # Edge-safe auth config (middleware only)
+  middleware.ts                 # Redirects unauthenticated users from /admin
 ```
 
 ---
@@ -403,43 +277,30 @@ public/
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tee-times` | Available slots for a date |
+| GET | `/api/tee-times?date=YYYY-MM-DD` | Slots, equipment, season info, sunset cutoff, private event blocks |
 | POST | `/api/tee-times` | Book a tee time |
-| POST | `/api/memberships` | Submit membership application |
+| DELETE | `/api/tee-times?id=` | Cancel a booking |
+| GET | `/api/memberships` | Membership tiers |
+| POST | `/api/memberships` | Create membership record |
+| GET | `/api/tournaments` | Upcoming tournaments |
+| GET | `/api/tournaments/[id]` | Tournament detail with entries and teams |
+| POST | `/api/tournaments/[id]/enter` | Register for a tournament |
+| DELETE | `/api/tournaments/[id]/enter` | Withdraw from a tournament |
+| GET | `/api/events` | Upcoming public events |
+| POST | `/api/events/[id]/register` | Register for an event |
+| GET | `/api/config/public` | Square app ID / location ID for browser |
 
 ### Admin Endpoints (require admin session)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/admin/tee-times` | All bookings for a date |
-| PATCH | `/api/admin/tee-times` | Edit booking details |
-| DELETE | `/api/admin/tee-times` | Cancel a booking |
-| GET | `/api/admin/charges` | List charges (filter by status) |
-| POST | `/api/admin/charges` | Create a charge |
-| PATCH | `/api/admin/charges/[id]` | Update charge status |
-| PATCH | `/api/admin/memberships/[id]` | Mark membership paid |
-| GET | `/api/admin/config` | Read site config |
-| POST | `/api/admin/config` | Update site config |
-
-### Webhook Endpoints
-
-| Method | Path | Auth |
-|--------|------|------|
-| POST | `/api/webhooks/square` | HMAC-SHA256 signature |
-| POST | `/api/webhooks/toast` | HMAC-SHA256 signature |
-
----
-
-## Offline Support
-
-The service worker caches key pages for offline use:
-
-| Route | Offline behavior |
-|-------|-----------------|
-| `/desk` | Fully cached — works offline after first visit |
-| `/tee-times` | Readable offline (no new bookings) |
-| `/login` | Cached for credential entry |
-| `/offline` | Fallback for uncached navigation |
-| `/api/*` | Returns `{ error: "Offline" }` with 503 |
-
-Data-write operations (payments, new bookings) require an internet connection.
+| GET/PUT | `/api/admin/settings` | Read/write site_config |
+| GET/POST/DELETE | `/api/admin/users` | Admin user management |
+| GET/POST/PATCH/DELETE | `/api/admin/events` | Full event management including private events |
+| GET/PUT | `/api/admin/tee-sheet?date=` | All slots for tee sheet view |
+| GET/POST/PUT/DELETE | `/api/admin/tee-times` | Booking management |
+| GET/POST/PUT/DELETE | `/api/admin/equipment` | Equipment inventory |
+| GET/POST | `/api/admin/billing/renew` | Preview/process membership renewals |
+| POST | `/api/admin/tournaments/[id]/draw` | Run blind draw |
+| PUT | `/api/admin/tournaments/[id]/scores` | Bulk score entry |
+| POST | `/api/admin/tournaments/[id]/tee-times` | Bulk tee time assignment |
