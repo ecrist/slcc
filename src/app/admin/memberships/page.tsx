@@ -6,6 +6,13 @@ import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 
 interface MembershipWithNfc extends Membership {
   nfc_token: string | null;
+  credit_limit: number | null;
+}
+
+interface InlineEdit {
+  id: number;
+  field: "nickname" | "credit_limit";
+  value: string;
 }
 
 export default function AdminMemberships() {
@@ -15,6 +22,7 @@ export default function AdminMemberships() {
   const [nfcModal, setNfcModal] = useState<MembershipWithNfc | null>(null);
   const [nfcWriting, setNfcWriting] = useState(false);
   const [nfcMsg, setNfcMsg] = useState("");
+  const [editing, setEditing] = useState<InlineEdit | null>(null);
 
   useEffect(() => { fetchMemberships(); }, []);
 
@@ -62,6 +70,27 @@ export default function AdminMemberships() {
     } finally {
       setNfcWriting(false);
     }
+  }
+
+  async function saveInlineEdit() {
+    if (!editing) return;
+    const { id, field, value } = editing;
+    setEditing(null);
+    await fetch("/api/admin/memberships", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, [field]: value || null }),
+    });
+    setMemberships((prev) =>
+      prev.map((m) => m.id === id ? { ...m, [field]: value || null } : m)
+    );
+  }
+
+  function startEdit(m: MembershipWithNfc, field: "nickname" | "credit_limit") {
+    const current = field === "credit_limit"
+      ? (m.credit_limit != null ? String(m.credit_limit) : "")
+      : (m.nickname ?? "");
+    setEditing({ id: m.id, field, value: current });
   }
 
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -120,6 +149,8 @@ export default function AdminMemberships() {
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium">Member #</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Nickname</th>
+                <th className="px-4 py-3 text-center text-sm font-medium">Credit Limit</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
                 <th className="px-4 py-3 text-center text-sm font-medium">Amount</th>
@@ -133,6 +164,49 @@ export default function AdminMemberships() {
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono text-sm">{m.member_number}</td>
                   <td className="px-4 py-3 font-medium">{m.first_name} {m.last_name}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {editing?.id === m.id && editing.field === "nickname" ? (
+                      <input
+                        autoFocus
+                        className="border border-swan-green rounded px-2 py-0.5 text-sm w-28 focus:outline-none"
+                        value={editing.value}
+                        onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+                        onBlur={saveInlineEdit}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(); if (e.key === "Escape") setEditing(null); }}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => startEdit(m, "nickname")}
+                        className="text-left text-gray-500 hover:text-swan-green"
+                        title="Click to set nickname"
+                      >
+                        {m.nickname ?? <span className="text-gray-300 text-xs italic">add nickname</span>}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center text-sm">
+                    {editing?.id === m.id && editing.field === "credit_limit" ? (
+                      <input
+                        autoFocus
+                        type="number"
+                        min="0"
+                        step="50"
+                        className="border border-swan-green rounded px-2 py-0.5 text-sm w-24 focus:outline-none"
+                        value={editing.value}
+                        onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+                        onBlur={saveInlineEdit}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(); if (e.key === "Escape") setEditing(null); }}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => startEdit(m, "credit_limit")}
+                        className="text-gray-500 hover:text-swan-green"
+                        title="Click to set credit limit"
+                      >
+                        {m.credit_limit != null ? `$${m.credit_limit}` : <span className="text-gray-300 text-xs italic">none</span>}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     {MEMBERSHIP_TYPES[m.membership_type as MembershipType]?.name || m.membership_type}
                   </td>

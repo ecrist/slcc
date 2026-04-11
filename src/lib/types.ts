@@ -30,6 +30,7 @@ export interface Membership {
   city: string | null;
   state: string;
   zip: string | null;
+  nickname: string | null;
   membership_type: string;
   start_date: string;
   end_date: string;

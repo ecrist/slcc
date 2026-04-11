@@ -53,14 +53,32 @@ async function findMembershipByName(
 ): Promise<{ id: number; member_name: string } | null> {
   if (!name) return null;
   const normalized = name.trim().toLowerCase();
-  const rows = await query<{ id: number; first_name: string; last_name: string }>(
-    `SELECT id, first_name, last_name FROM memberships WHERE status = 'active'`
+  const rows = await query<{ id: number; first_name: string; last_name: string; nickname: string | null }>(
+    `SELECT id, first_name, last_name, nickname FROM memberships WHERE status = 'active'`
   );
-  // Exact full-name match first, then partial
-  const exact = rows.find(
+
+  // Priority order:
+  // 1. Exact nickname match  (e.g. tab name "Smitty" → nickname "Smitty")
+  // 2. Exact full-name match (e.g. tab name "John Smith")
+  // 3. Nickname contains / is contained by the tab name
+  // 4. Last name only / partial full-name match
+  const nicknameExact = rows.find(
+    (r) => r.nickname?.toLowerCase() === normalized
+  );
+  if (nicknameExact) return { id: nicknameExact.id, member_name: `${nicknameExact.first_name} ${nicknameExact.last_name}` };
+
+  const fullNameExact = rows.find(
     (r) => `${r.first_name} ${r.last_name}`.toLowerCase() === normalized
   );
-  if (exact) return { id: exact.id, member_name: `${exact.first_name} ${exact.last_name}` };
+  if (fullNameExact) return { id: fullNameExact.id, member_name: `${fullNameExact.first_name} ${fullNameExact.last_name}` };
+
+  const nicknamePartial = rows.find(
+    (r) => r.nickname && (
+      normalized.includes(r.nickname.toLowerCase()) ||
+      r.nickname.toLowerCase().includes(normalized)
+    )
+  );
+  if (nicknamePartial) return { id: nicknamePartial.id, member_name: `${nicknamePartial.first_name} ${nicknamePartial.last_name}` };
 
   const partial = rows.find(
     (r) =>

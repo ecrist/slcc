@@ -16,14 +16,15 @@ export async function GET(request: NextRequest) {
 
   const like = `%${q}%`;
   const results = await query(
-    `SELECT id, first_name, last_name, email, membership_type, status, nfc_token
+    `SELECT id, first_name, last_name, nickname, email, membership_type, status, nfc_token
      FROM memberships
      WHERE status = 'active'
        AND (first_name ILIKE $1 OR last_name ILIKE $2 OR email ILIKE $3
-            OR (first_name || ' ' || last_name) ILIKE $4)
+            OR (first_name || ' ' || last_name) ILIKE $4
+            OR nickname ILIKE $5)
      ORDER BY last_name, first_name
      LIMIT 10`,
-    [like, like, like, like]
+    [like, like, like, like, like]
   );
 
   return NextResponse.json(results);

@@ -22,6 +22,7 @@ const EMPTY_FORM = {
   zip: "",
   email: "",
   phone: "",
+  nickname: "",
   notes: "",
 };
 
@@ -113,6 +114,7 @@ export default function ContactsPage() {
       zip: c.zip ?? "",
       email: c.email ?? "",
       phone: c.phone ?? "",
+      nickname: (c as Contact & { nickname?: string }).nickname ?? "",
       notes: c.notes ?? "",
     });
   }
@@ -154,6 +156,15 @@ export default function ContactsPage() {
         <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
         <input type="email" className="input-field w-full" value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">
+          Nickname
+          <span className="ml-1 font-normal text-gray-400">— used for Toast tab name matching</span>
+        </label>
+        <input className="input-field w-full" value={form.nickname}
+          onChange={(e) => setForm({ ...form, nickname: e.target.value })}
+          placeholder="e.g. Smitty" />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>

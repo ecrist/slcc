@@ -234,6 +234,9 @@ async function migrate() {
       // Toast POS dedup / source tracking
       "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS external_id TEXT UNIQUE",
       "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'",
+      // Nickname for member name matching (Toast tab names, desk search, etc.)
+      "ALTER TABLE memberships ADD COLUMN IF NOT EXISTS nickname TEXT",
+      "ALTER TABLE contacts   ADD COLUMN IF NOT EXISTS nickname TEXT",
       // Contact / corporate-event linking
       "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL",
       "ALTER TABLE member_charges ADD COLUMN IF NOT EXISTS event_id   INTEGER REFERENCES events(id) ON DELETE SET NULL",
