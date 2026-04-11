@@ -218,22 +218,49 @@ Log in, add your own email as an admin at `/admin/settings`, then remove the def
 
 ---
 
-## Production Deployment (PM2 + nginx)
+## Production Deployment (Vultr + PM2 + nginx)
+
+**Target:** Vultr Cloud Compute — 2 vCPU / 4 GB RAM / 80 GB NVMe / Ubuntu 24.04 LTS (~$24/mo)
+
+### Initial server setup
 
 ```bash
-# Build
-npm run build
-
-# Start with PM2
-pm2 start npm --name swan-lake -- start
-pm2 save
-pm2 startup
-
-# nginx proxy to port 3000
-# SSL via Let's Encrypt / certbot
+# Run once as root on a fresh VM
+bash deploy/server-setup.sh
 ```
 
-The SQLite database file (`swan-lake.db`) lives in the project root. Back it up regularly — WAL mode is enabled for safe concurrent reads.
+Then follow the printed next-steps in the script output (clone repo, create `.env.local`, run migrations, start PM2, configure nginx, issue SSL cert).
+
+### Required `.env.local` on the server
+
+```
+DATABASE_URL=postgresql://swanlake:PASSWORD@localhost/swanlake
+AUTH_SECRET=<openssl rand -base64 32>
+NEXTAUTH_URL=https://book.swanlakecc.com
+```
+
+### CI/CD — GitHub Actions
+
+Push to `main` → type-check runs on GitHub's runner → if it passes, deploys to the Vultr VM via SSH.
+
+**One-time setup:** add three secrets in GitHub → Settings → Secrets → Actions:
+
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_HOST` | Vultr VM IP address |
+| `DEPLOY_USER` | `deploy` (created by setup script) |
+| `DEPLOY_SSH_KEY` | Private half of the ED25519 key whose public half is in `~deploy/.ssh/authorized_keys` |
+
+The deploy job runs: `git pull` → `npm ci` → `npm run build` → `npm run db:migrate` → `pm2 reload` (zero-downtime rolling restart).
+
+### Database backups
+
+PostgreSQL lives on the same VM. Schedule a daily `pg_dump` and ship it offsite (Vultr Object Storage, S3, etc.):
+
+```bash
+# /etc/cron.d/swan-lake-backup
+0 3 * * * deploy pg_dump swanlake | gzip > /backups/swanlake-$(date +\%F).sql.gz
+```
 
 ---
 
