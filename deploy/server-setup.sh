@@ -45,7 +45,7 @@ ok "Packages installed"
 # ── 2. Node.js 22 LTS ─────────────────────────────────────────────────────────
 bold "[2/9] Node.js ${NODE_VERSION}.x LTS"
 if ! command -v node &>/dev/null || [[ "$(node -v)" != v${NODE_VERSION}* ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - -y
+  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
   apt-get install -y nodejs
 fi
 ok "Node $(node -v) / npm $(npm -v)"
