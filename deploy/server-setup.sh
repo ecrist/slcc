@@ -17,7 +17,7 @@ set -euo pipefail
 DEPLOY_USER="deploy"
 APP_DIR="/var/www/swan-lake"
 REPO_SSH="git@github.com:ecrist/slcc.git"
-DOMAIN="book.swanlakecc.com"
+DOMAIN="slcc.secure-computing.net"
 NODE_VERSION="22"
 PG_DB="swanlake"
 PG_USER="swanlake"
