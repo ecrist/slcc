@@ -6,6 +6,9 @@
  *
  * Safe to re-run — uses CREATE TABLE IF NOT EXISTS and ON CONFLICT DO NOTHING.
  */
+import { config } from "dotenv";
+import { resolve } from "path";
+config({ path: resolve(process.cwd(), ".env.local") });
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
 
