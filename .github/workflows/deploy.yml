@@ -114,6 +114,7 @@ jobs:
     if: >-
       (inputs.branch != '' && inputs.branch || github.ref_name) == 'boxfort' ||
       (inputs.branch != '' && inputs.branch || github.ref_name) == 'gorilla'
+    environment: production
 
     steps:
       - name: Deploy via SSH
