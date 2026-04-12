@@ -46,7 +46,7 @@ export default function Header() {
           <Link href="/" className="flex items-center space-x-3">
             <div className="bg-white rounded-full h-12 w-12 flex items-center justify-center p-1 shadow-md">
               <img
-                src="/icons/swan-logo.svg"
+                src="/icons/swan-logo.png"
                 alt="Swan Lake CC"
                 className="h-9 w-9 object-contain"
               />
