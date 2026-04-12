@@ -133,8 +133,9 @@ jobs:
             echo "==> Deploying ${BRANCH} → ${APP_DIR} (port ${PORT})"
             cd "$APP_DIR"
 
-            echo "==> Pulling latest code"
-            git pull origin "$BRANCH"
+            echo "==> Resetting to match remote (discard server-local edits)"
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
 
             echo "==> Installing dependencies"
             npm ci --legacy-peer-deps
