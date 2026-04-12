@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140" fill="none">
+  <!-- Swan body and neck - black line art with orange beak -->
+  <path d="M58 42 C54 38, 48 30, 44 24 C40 18, 34 12, 28 10 C22 8, 18 10, 16 14 C14 18, 16 22, 20 24"
+        stroke="black" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Beak -->
+  <path d="M16 14 C12 12, 6 12, 2 14 C6 16, 12 16, 16 14Z" fill="#E8851A" stroke="#E8851A" stroke-width="0.5"/>
+  <!-- Eye -->
+  <circle cx="20" cy="17" r="1.5" fill="black"/>
+  <!-- Head to neck curve -->
+  <path d="M20 24 C24 28, 32 34, 40 40 C48 46, 56 48, 62 46"
+        stroke="black" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Upper body line -->
+  <path d="M62 46 C70 42, 80 40, 92 42 C104 44, 120 50, 140 58 C155 64, 168 68, 178 66 C186 64, 192 58, 194 50"
+        stroke="black" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Lower body line -->
+  <path d="M58 42 C54 48, 52 56, 54 64 C56 72, 62 80, 72 86 C82 92, 96 96, 112 96 C128 96, 144 92, 156 84 C168 76, 176 66, 180 56"
+        stroke="black" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Tail feathers -->
+  <path d="M178 66 C182 62, 188 56, 190 48 C192 42, 190 38, 186 40 C182 42, 180 48, 180 56"
+        stroke="black" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M186 40 C190 36, 196 32, 198 26"
+        stroke="black" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <!-- Wing detail -->
+  <path d="M80 52 C90 48, 100 50, 110 56 C120 62, 128 66, 136 66"
+        stroke="black" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <path d="M90 60 C100 56, 110 58, 120 64"
+        stroke="black" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>

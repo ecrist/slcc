@@ -44,11 +44,12 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <Link href="/" className="flex items-center space-x-3">
-            <div className="text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 2C8 2 4 5 4 9c0 3 2 5 4 6l1 5h6l1-5c2-1 4-3 4-6 0-4-4-7-8-7z" />
-                <circle cx="12" cy="8" r="2" fill="currentColor" />
-              </svg>
+            <div className="bg-white rounded-full h-12 w-12 flex items-center justify-center p-1 shadow-md">
+              <img
+                src="/icons/swan-logo.svg"
+                alt="Swan Lake CC"
+                className="h-9 w-9 object-contain"
+              />
             </div>
             <div>
               <h1 className="text-white font-bold text-xl leading-tight">Swan Lake</h1>
