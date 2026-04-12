@@ -8,3 +8,4 @@ out/
 *.db-wal
 *.sqlite
 tsconfig.tsbuildinfo
+CLAUDE.local.md
