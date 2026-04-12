@@ -317,6 +317,71 @@ Three are required:
 |----------|-------|
 | `DATABASE_URL` | PostgreSQL connection string — `postgresql://user:pass@host/dbname` |
 | `AUTH_SECRET` | 32-byte base64 string — `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Full app URL, e.g. `https://book.swanlakecc.com` |
+| `NEXTAUTH_URL` | Full app URL, e.g. `https://slcc.secure-computing.net` |
 
 Everything else is in the database.
+
+---
+
+## Deployment & Environments
+
+Hosted on a single Vultr VM (Ubuntu 24.04 LTS, 2 vCPU / 4 GB / 80 GB NVMe). Three live environments share the VM, each with its own PostgreSQL database, PM2 process, and nginx vhost.
+
+| Environment | Branch | URL | Port | Database |
+|-------------|--------|-----|------|----------|
+| Production | `main` | `https://slcc.secure-computing.net` | 3000 | `swanlake` |
+| Boxfort (dev) | `boxfort` | `https://boxfort.secure-computing.net` | 3001 | `swanlake_boxfort` |
+| Gorilla (dev) | `gorilla` | `https://gorilla.secure-computing.net` | 3002 | `swanlake_gorilla` |
+
+The domain is Cloudflare-proxied. The raw server IP (`45.63.69.172` / `slcc-real.secure-computing.net`) is used for `DEPLOY_HOST` in GitHub Actions secrets so SSH bypasses Cloudflare.
+
+### CI/CD pipeline (GitHub Actions)
+
+Every push to `main`, `boxfort`, or `gorilla` runs:
+
+1. **Type Check** — `tsc --noEmit` on a GitHub runner
+2. **Tests** — 22 unit + integration tests against an ephemeral postgres:16 container
+3. **Deploy** — SSH to the VM → `git pull` → `npm ci` → `npm run build` → `npm run db:migrate` → `pm2 reload` (zero-downtime)
+
+Deploy only runs if both type check and tests pass.
+
+**Manual trigger:** GitHub → Actions → Deploy → Run workflow → select branch. The `branch` input overrides the branch the workflow was triggered on, so you can re-deploy any environment without pushing a commit.
+
+### GitHub Actions secrets required
+
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_HOST` | Server IP or non-proxied hostname (`slcc-real.secure-computing.net`) |
+| `DEPLOY_USER` | `deploy` |
+| `DEPLOY_SSH_KEY` | ED25519 private key — `cat /home/deploy/.ssh/actions_deploy` on the server |
+
+### Initial server provisioning
+
+```bash
+# Fresh VM — run once as root
+bash deploy/server-setup.sh
+
+# Dev environments — run once as root after server-setup.sh
+bash deploy/branch-setup.sh
+```
+
+`server-setup.sh` installs Node 22, PostgreSQL, nginx, PM2, certbot, and UFW; generates SSH key pairs; writes `.env.local`; prints next steps.
+
+`branch-setup.sh` provisions both dev environments: creates databases, clones the correct branch, installs, builds, starts PM2, and writes nginx vhosts.
+
+### nginx configs
+
+| File | Purpose |
+|------|---------|
+| `deploy/nginx.conf` | Production SSL vhost (port 443 → 3000) |
+| `deploy/nginx-boxfort.conf` | Boxfort SSL vhost (port 443 → 3001) |
+| `deploy/nginx-gorilla.conf` | Gorilla SSL vhost (port 443 → 3002) |
+
+All use `listen 443 ssl http2` syntax (nginx 1.24 on Ubuntu 24.04 — `http2 on;` directive requires nginx ≥ 1.25.1).
+
+### Adding a third dev environment
+
+1. Pick a name and port (e.g. `feature-x` / `3003`)
+2. On the server as root: create the DB, app dir, `.env.local`, clone the branch, build, start PM2, write nginx vhost, issue SSL cert
+3. Add the branch to `on.push.branches` and the `if` condition in `deploy-branch` in `.github/workflows/deploy.yml`
+4. Create and push the branch: `git checkout -b feature-x && git push -u origin feature-x`

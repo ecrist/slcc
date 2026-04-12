@@ -218,44 +218,61 @@ Log in, add your own email as an admin at `/admin/settings`, then remove the def
 
 ---
 
-## Production Deployment (Vultr + PM2 + nginx)
+## Deployment
 
-**Target:** Vultr Cloud Compute — 2 vCPU / 4 GB RAM / 80 GB NVMe / Ubuntu 24.04 LTS (~$24/mo)
+Hosted on a single Vultr VM (Ubuntu 24.04 LTS, 2 vCPU / 4 GB RAM / 80 GB NVMe, ~$24/mo) running three live environments:
+
+| Environment | Branch | URL | Port |
+|-------------|--------|-----|------|
+| Production | `main` | `https://slcc.secure-computing.net` | 3000 |
+| Boxfort (dev) | `boxfort` | `https://boxfort.secure-computing.net` | 3001 |
+| Gorilla (dev) | `gorilla` | `https://gorilla.secure-computing.net` | 3002 |
+
+### CI/CD Pipeline
+
+Every push to `main`, `boxfort`, or `gorilla` triggers:
+
+1. **TypeScript type check** — runs on a GitHub runner
+2. **Tests** — 22 unit + integration tests against an ephemeral postgres:16 container
+3. **Deploy via SSH** — `git pull` → `npm ci` → `npm run build` → `npm run db:migrate` → `pm2 reload` (zero-downtime)
+
+Deploy only proceeds if both type check and tests pass.
+
+**Manual deploy (no commit needed):** GitHub → Actions → Deploy → Run workflow → enter the target branch name.
+
+### GitHub Actions secrets
+
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_HOST` | Server IP or non-proxied hostname — use the real IP, not the Cloudflare proxy |
+| `DEPLOY_USER` | `deploy` |
+| `DEPLOY_SSH_KEY` | ED25519 private key — `cat /home/deploy/.ssh/actions_deploy` on the server |
 
 ### Initial server setup
 
 ```bash
-# Run once as root on a fresh VM
+# Run once as root on a fresh VM — installs Node, PostgreSQL, nginx, PM2, certbot, UFW
 bash deploy/server-setup.sh
+
+# After server-setup.sh — provisions boxfort and gorilla dev environments
+bash deploy/branch-setup.sh
 ```
 
-Then follow the printed next-steps in the script output (clone repo, create `.env.local`, run migrations, start PM2, configure nginx, issue SSL cert).
+`server-setup.sh` prints everything you need to do in GitHub (deploy key, Actions secrets, DNS) and the exact commands to run for the first deploy.
 
 ### Required `.env.local` on the server
 
 ```
 DATABASE_URL=postgresql://swanlake:PASSWORD@localhost/swanlake
 AUTH_SECRET=<openssl rand -base64 32>
-NEXTAUTH_URL=https://book.swanlakecc.com
+NEXTAUTH_URL=https://slcc.secure-computing.net
 ```
 
-### CI/CD — GitHub Actions
-
-Push to `main` → type-check runs on GitHub's runner → if it passes, deploys to the Vultr VM via SSH.
-
-**One-time setup:** add three secrets in GitHub → Settings → Secrets → Actions:
-
-| Secret | Value |
-|--------|-------|
-| `DEPLOY_HOST` | Vultr VM IP address |
-| `DEPLOY_USER` | `deploy` (created by setup script) |
-| `DEPLOY_SSH_KEY` | Private half of the ED25519 key whose public half is in `~deploy/.ssh/authorized_keys` |
-
-The deploy job runs: `git pull` → `npm ci` → `npm run build` → `npm run db:migrate` → `pm2 reload` (zero-downtime rolling restart).
+Dev environments get their own `.env.local` with separate database URLs, written by `branch-setup.sh`.
 
 ### Database backups
 
-PostgreSQL lives on the same VM. Schedule a daily `pg_dump` and ship it offsite (Vultr Object Storage, S3, etc.):
+PostgreSQL lives on the same VM. Schedule a daily `pg_dump` and ship it offsite:
 
 ```bash
 # /etc/cron.d/swan-lake-backup
@@ -315,7 +332,7 @@ src/
     SquareWalletButtons.tsx     # Google Pay / Apple Pay (fetches config at runtime)
   lib/
     db/
-      index.ts                  # SQLite connection, schema, migrations, config seeding
+      index.ts                  # PostgreSQL pool, typed query/execute helpers
       setup.ts                  # Dev seed script
     admin.ts                    # isAdminEmail(), getConfigValue()
     email.ts                    # SMTP transactional email
