@@ -132,7 +132,8 @@ jobs:
             npm run db:migrate
 
             echo "==> Reloading PM2 (zero-downtime)"
-            pm2 reload "$BRANCH" --update-env
+            PORT=$( [ "$BRANCH" = "boxfort" ] && echo 3001 || echo 3002 )
+            pm2 reload "$BRANCH" --update-env -- start --port "$PORT"
 
             echo "==> Done"
             pm2 status
