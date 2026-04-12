@@ -2,11 +2,11 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:   # allow manual trigger from GitHub UI
+    branches: [main, boxfort, gorilla]
+  workflow_dispatch:
 
 jobs:
-  # ── Type-check on GitHub runner (fast feedback before touching the server) ──
+  # ── Type-check ───────────────────────────────────────────────────────────────
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
@@ -58,12 +58,13 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/swanlake_test
         run: npm test
 
-  # ── Deploy to Vultr VM ───────────────────────────────────────────────────────
-  deploy:
+  # ── Deploy: production (main) ─────────────────────────────────────────────────
+  deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [typecheck, test]  # only deploy if type check and tests pass
-    environment: production   # requires environment approval if configured
+    needs: [typecheck, test]
+    if: github.ref_name == 'main'
+    environment: production
 
     steps:
       - name: Deploy via SSH
@@ -75,9 +76,7 @@ jobs:
           port: 22
           script: |
             set -euo pipefail
-
-            APP_DIR="/var/www/swan-lake"
-            cd "$APP_DIR"
+            cd /var/www/swan-lake
 
             echo "==> Pulling latest code"
             git pull origin main
@@ -93,6 +92,47 @@ jobs:
 
             echo "==> Reloading PM2 (zero-downtime)"
             pm2 reload swan-lake --update-env
+
+            echo "==> Done"
+            pm2 status
+
+  # ── Deploy: branch environments (boxfort / gorilla) ──────────────────────────
+  deploy-branch:
+    name: Deploy ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    needs: [typecheck, test]
+    if: github.ref_name == 'boxfort' || github.ref_name == 'gorilla'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            BRANCH="${{ github.ref_name }}"
+            APP_DIR="/var/www/${BRANCH}"
+
+            echo "==> Deploying branch: ${BRANCH} → ${APP_DIR}"
+            cd "$APP_DIR"
+
+            echo "==> Pulling latest code"
+            git pull origin "$BRANCH"
+
+            echo "==> Installing dependencies"
+            npm ci --legacy-peer-deps
+
+            echo "==> Building"
+            npm run build
+
+            echo "==> Running migrations"
+            npm run db:migrate
+
+            echo "==> Reloading PM2 (zero-downtime)"
+            pm2 reload "$BRANCH" --update-env
 
             echo "==> Done"
             pm2 status
