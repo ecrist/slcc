@@ -40,6 +40,7 @@ setup_env() {
   fi
   DB_PASS=$(cat "$PG_PASS_FILE")
 
+  # Create user (idempotent)
   sudo -u postgres psql -v ON_ERROR_STOP=0 <<SQL
 DO \$\$
 BEGIN
@@ -50,11 +51,13 @@ BEGIN
   END IF;
 END
 \$\$;
-SELECT 'CREATE DATABASE' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${PG_DB}') \gexec
-GRANT ALL PRIVILEGES ON DATABASE ${PG_DB} TO ${PG_USER};
 SQL
-  # Grant schema permissions (needed in PostgreSQL 15+)
-  sudo -u postgres psql -d "$PG_DB" -c "GRANT ALL ON SCHEMA public TO ${PG_USER};" 2>/dev/null || true
+  # Create database if it doesn't exist (createdb is simpler than \gexec)
+  if ! sudo -u postgres psql -lqt | cut -d'|' -f1 | grep -qw "${PG_DB}"; then
+    sudo -u postgres createdb -O "${PG_USER}" "${PG_DB}"
+  fi
+  sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DB} TO ${PG_USER};" 2>/dev/null || true
+  sudo -u postgres psql -d "${PG_DB}" -c "GRANT ALL ON SCHEMA public TO ${PG_USER};" 2>/dev/null || true
   ok "Database '${PG_DB}' ready"
 
   # ── App directory ───────────────────────────────────────────────────────────
@@ -82,13 +85,15 @@ ENV
   fi
 
   # ── Clone repo and install ──────────────────────────────────────────────────
-  if [ ! -d "${APP_DIR}/.git" ]; then
+  if [ ! -f "${APP_DIR}/package.json" ]; then
+    # No package.json — init git and check out branch (handles fresh or broken state)
     sudo -u "$DEPLOY_USER" bash -c "
       cd ${APP_DIR}
       git init
+      git remote remove origin 2>/dev/null || true
       git remote add origin ${REPO_SSH}
       git fetch origin
-      git checkout -t origin/${BRANCH}
+      git checkout -t origin/${BRANCH} 2>/dev/null || git checkout ${BRANCH}
     "
     ok "Repo cloned (branch: ${BRANCH})"
   else
