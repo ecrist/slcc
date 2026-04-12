@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSession, signIn, signOut } from "next-auth/react";
 
 async function gravatarUrl(email: string): Promise<string> {
@@ -17,6 +18,7 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: session } = useSession();
   const [avatar, setAvatar] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -86,7 +88,7 @@ export default function Header() {
                   </Link>
                 )}
                 <button
-                  onClick={() => signOut()}
+                  onClick={async () => { await signOut({ redirect: false }); router.push("/"); }}
                   className="text-white/60 hover:text-white transition-colors font-medium text-sm"
                 >
                   Sign Out
@@ -94,7 +96,7 @@ export default function Header() {
               </div>
             ) : (
               <button
-                onClick={() => signIn()}
+                onClick={() => router.push("/login")}
                 className="btn-secondary text-sm py-2 px-4"
               >
                 Sign In
@@ -142,7 +144,7 @@ export default function Header() {
                   </Link>
                 )}
                 <button
-                  onClick={() => { signOut(); setMobileOpen(false); }}
+                  onClick={async () => { await signOut({ redirect: false }); setMobileOpen(false); router.push("/"); }}
                   className="block text-white/60 hover:text-white font-medium"
                 >
                   Sign Out
@@ -150,7 +152,7 @@ export default function Header() {
               </>
             ) : (
               <button
-                onClick={() => { signIn(); setMobileOpen(false); }}
+                onClick={() => { router.push("/login"); setMobileOpen(false); }}
                 className="block text-swan-gold hover:text-swan-gold-light font-medium"
               >
                 Sign In
