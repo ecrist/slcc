@@ -328,9 +328,9 @@ export default function TeeTimesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`grid grid-cols-1 ${bookingSlot ? "lg:grid-cols-3" : ""} gap-8`}>
         {/* Time Slots */}
-        <div className="lg:col-span-2">
+        <div className={bookingSlot ? "lg:col-span-2" : ""}>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <h2 className="text-xl font-bold">Available Times — {formatDateDisplay(selectedDate)}</h2>
             {slotsNeeded > 1 && (

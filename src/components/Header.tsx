@@ -60,8 +60,14 @@ export default function Header() {
           </Link>
 
           <nav className="hidden md:flex items-center space-x-8">
+            <Link href="/course" className="text-white hover:text-swan-gold transition-colors font-medium">
+              Course
+            </Link>
             <Link href="/tee-times" className="text-white hover:text-swan-gold transition-colors font-medium">
               Tee Times
+            </Link>
+            <Link href="/rates" className="text-white hover:text-swan-gold transition-colors font-medium">
+              Rates
             </Link>
             <Link href="/memberships" className="text-white hover:text-swan-gold transition-colors font-medium">
               Memberships
@@ -71,6 +77,9 @@ export default function Header() {
             </Link>
             <Link href="/tournaments" className="text-white hover:text-swan-gold transition-colors font-medium">
               Tournaments
+            </Link>
+            <Link href="/about" className="text-white hover:text-swan-gold transition-colors font-medium">
+              About
             </Link>
             {session ? (
               <div className="flex items-center gap-3">
@@ -123,8 +132,14 @@ export default function Header() {
       {mobileOpen && (
         <div className="md:hidden bg-swan-green-light border-t border-swan-green">
           <div className="px-4 py-3 space-y-3">
+            <Link href="/course" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
+              Course
+            </Link>
             <Link href="/tee-times" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
               Tee Times
+            </Link>
+            <Link href="/rates" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
+              Rates
             </Link>
             <Link href="/memberships" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
               Memberships
@@ -134,6 +149,9 @@ export default function Header() {
             </Link>
             <Link href="/tournaments" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
               Tournaments
+            </Link>
+            <Link href="/about" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
+              About
             </Link>
             {session ? (
               <>
