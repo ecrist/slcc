@@ -249,10 +249,23 @@ async function migrate() {
       "ALTER TABLE events ADD COLUMN IF NOT EXISTS is_corporate_event SMALLINT NOT NULL DEFAULT 0",
       // Walk-in contact linkage on check-in log
       "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL",
+      // Link memberships to user accounts
+      "ALTER TABLE memberships ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+      // Add phone to users for profile completeness
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
     ];
     for (const sql of alterations) {
       await client.query(sql);
     }
+
+    // ── Backfill: link memberships to users by email ─────────────────────────
+    await client.query(`
+      UPDATE memberships m
+      SET user_id = u.id
+      FROM users u
+      WHERE LOWER(m.email) = LOWER(u.email)
+        AND m.user_id IS NULL
+    `);
 
     // ── Indexes ────────────────────────────────────────────────────────────────
     const indexes = [

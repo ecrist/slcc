@@ -8,15 +8,16 @@ const { auth } = NextAuth(authConfig);
 // Only checks authentication; admin authorisation (PostgreSQL lookup)
 // happens in the server-component admin layout which runs on Node.js.
 export default auth((req) => {
-  const isAdminPath = req.nextUrl.pathname.startsWith("/admin");
+  const path = req.nextUrl.pathname;
+  const isProtected = path.startsWith("/admin") || path.startsWith("/settings");
 
-  if (isAdminPath && !req.auth) {
+  if (isProtected && !req.auth) {
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
+    loginUrl.searchParams.set("callbackUrl", path);
     return NextResponse.redirect(loginUrl);
   }
 });
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/settings/:path*"],
 };

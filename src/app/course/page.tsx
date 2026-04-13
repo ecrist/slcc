@@ -1,18 +1,18 @@
 export default function CoursePage() {
   const scorecard = [
-    { hole: 1, par: 4, hcp: 2, blue: 430, white: 414, red: 388 },
+    { hole: 1, par: "4/5", hcp: 2, blue: 430, white: 414, red: 388 },
     { hole: 2, par: 3, hcp: 3, blue: 196, white: 162, red: 141 },
     { hole: 3, par: 4, hcp: 6, blue: 358, white: 337, red: 270 },
     { hole: 4, par: 5, hcp: 5, blue: 460, white: 444, red: 401 },
     { hole: 5, par: 3, hcp: 9, blue: 154, white: 142, red: 120 },
     { hole: 6, par: 4, hcp: 8, blue: 354, white: 333, red: 309 },
     { hole: 7, par: 4, hcp: 7, blue: 323, white: 315, red: 307 },
-    { hole: 8, par: 4, hcp: 1, blue: 455, white: 437, red: 416 },
+    { hole: 8, par: "4/5", hcp: 1, blue: 455, white: 437, red: 416 },
     { hole: 9, par: 5, hcp: 4, blue: 505, white: 495, red: 400 },
   ];
 
   const totals = {
-    par: scorecard.reduce((s, h) => s + h.par, 0),
+    par: scorecard.reduce((s, h) => s + (typeof h.par === "number" ? h.par : 4), 0),
     blue: scorecard.reduce((s, h) => s + h.blue, 0),
     white: scorecard.reduce((s, h) => s + h.white, 0),
     red: scorecard.reduce((s, h) => s + h.red, 0),
@@ -21,7 +21,7 @@ export default function CoursePage() {
   return (
     <div>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="section-title">The Course</h1>
+        <h1 className="section-title">Golf Course Overview</h1>
         <p className="text-gray-500 mb-10">9 Holes &middot; Par 36 &middot; Est. 1929</p>
         <div className="prose prose-lg max-w-none text-gray-700">
           <p>
@@ -120,7 +120,7 @@ export default function CoursePage() {
           </table>
         </div>
         <p className="text-center text-gray-500 text-sm mt-4">
-          Hole 8 is par 5 for ladies. Yardages are approximate.
+          Holes 1 and 8 have separate mens (4) and ladies (5) par.
         </p>
       </section>
 

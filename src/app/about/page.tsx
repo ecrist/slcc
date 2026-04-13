@@ -22,10 +22,12 @@ export default function AboutPage() {
       {/* Leadership */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <h2 className="section-title text-center mb-8">Personnel</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             <div className="card text-center">
               <h3 className="font-bold text-lg text-swan-green">Club Manager</h3>
               <p className="text-xl mt-2">Laurie Chellico</p>
+              <a href="tel:+12188853543" className="text-swan-green hover:underline text-sm mt-1 inline-block">(218) 885-3543</a>
               <p className="text-gray-500 text-sm mt-1">2024 &ndash; Current</p>
             </div>
             <div className="card text-center">
@@ -36,12 +38,13 @@ export default function AboutPage() {
             <div className="card text-center">
               <h3 className="font-bold text-lg text-swan-green">President</h3>
               <p className="text-xl mt-2">Mike Anderson</p>
+              <a href="tel:+12189691450" className="text-swan-green hover:underline text-sm mt-1 inline-block">(218) 969-1450</a>
               <p className="text-gray-500 text-sm mt-1">2025 &ndash; 2027</p>
             </div>
           </div>
 
-          <h3 className="text-xl font-bold text-swan-green mb-6">Board of Directors</h3>
           <div className="card">
+            <h3 className="text-xl font-bold text-swan-green mb-4 text-center">Board of Directors</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -98,7 +101,7 @@ export default function AboutPage() {
 
       {/* Contact */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="section-title">Contact &amp; Directions</h2>
+        <h2 className="section-title text-center mb-8">Contact Info</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <a href="tel:+12188853543" className="card text-center hover:shadow-lg transition-shadow">
             <svg className="h-8 w-8 text-swan-green mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

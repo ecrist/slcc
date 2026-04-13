@@ -23,14 +23,31 @@ export const { auth, handlers, signIn, signOut } = NextAuth(async () => {
   return {
     ...authConfig,
     callbacks: {
-      async jwt({ token, user }) {
-        if (user) token.id = user.id;
+      async jwt({ token, user, trigger }) {
+        if (user) {
+          token.id = user.id;
+          token.name = user.name;
+        }
         if (user?.email) token.isAdmin = await isAdminEmail(user.email);
+        // Refresh name/email from DB on every token refresh so profile
+        // changes show up without requiring a new login.
+        if (token.id && (trigger === "update" || !user)) {
+          const fresh = await queryOne<{ name: string; email: string }>(
+            "SELECT name, email FROM users WHERE id = $1",
+            [token.id]
+          );
+          if (fresh) {
+            token.name = fresh.name;
+            token.email = fresh.email;
+          }
+        }
         return token;
       },
       session({ session, token }) {
         if (session.user && token.id) session.user.id = token.id as string;
         if (session.user) session.user.isAdmin = (token.isAdmin as boolean) ?? false;
+        if (session.user && token.name) session.user.name = token.name as string;
+        if (session.user && token.email) session.user.email = token.email as string;
         return session;
       },
     },

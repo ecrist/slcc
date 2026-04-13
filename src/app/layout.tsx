@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto_Condensed, Merriweather } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
+import AdminBar from "@/components/AdminBar";
 import Footer from "@/components/Footer";
 import SessionProvider from "@/components/SessionProvider";
 import PwaProvider from "@/components/PwaProvider";
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className={`${robotoCondensed.variable} ${merriweather.variable} font-body flex flex-col min-h-screen`}>
         <SessionProvider>
           <Header />
+          <AdminBar />
           <main className="flex-1">{children}</main>
           <Footer />
           <PwaProvider />

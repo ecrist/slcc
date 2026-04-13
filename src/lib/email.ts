@@ -136,6 +136,34 @@ export async function sendMembershipReceipt(opts: {
   );
 }
 
+// ── Account invite (admin-created membership) ─────────────────────────────────
+
+export async function sendAccountInvite(opts: {
+  to: string;
+  first_name: string;
+  member_number: string;
+}) {
+  const SITE = getSiteUrl();
+  await send(
+    opts.to,
+    `Welcome to Swan Lake CC — Set Up Your Account`,
+    layout(`
+      <h2 style="color:#1a4a2e;margin:0 0 4px;">Welcome to Swan Lake Country Club!</h2>
+      <p style="margin:0 0 16px;color:#4b5563;">
+        Hi ${opts.first_name}, a membership has been created for you (member #${opts.member_number}).
+        An account has been set up with this email address. Please set your password to get started.
+      </p>
+      <a href="${SITE}/login" style="background:#1a4a2e;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block;">
+        Sign In &amp; Set Password
+      </a>
+      <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
+        Once logged in, visit your <a href="${SITE}/settings" style="color:#1a4a2e;">account settings</a> to update your password and profile.
+        Questions? Call (218) 885-3543 or email <a href="mailto:golf@swanlakecc.com" style="color:#1a4a2e;">golf@swanlakecc.com</a>.
+      </p>
+    `)
+  );
+}
+
 // ── Membership renewal reminder ────────────────────────────────────────────────
 
 export async function sendRenewalReminder(opts: {

@@ -26,10 +26,18 @@ export async function POST(request: NextRequest) {
   }
 
   const hash = await bcrypt.hash(password, 12);
-  await execute(
-    "INSERT INTO users (email, name, password_hash) VALUES ($1,$2,$3)",
+  const newUser = await queryOne<{ id: number }>(
+    "INSERT INTO users (email, name, password_hash) VALUES ($1,$2,$3) RETURNING id",
     [normalizedEmail, name.trim(), hash]
   );
+
+  // Auto-link any existing memberships with this email
+  if (newUser) {
+    await execute(
+      "UPDATE memberships SET user_id = $1 WHERE LOWER(email) = $2 AND user_id IS NULL",
+      [newUser.id, normalizedEmail]
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

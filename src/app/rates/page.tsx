@@ -4,8 +4,17 @@ export default function RatesPage() {
   return (
     <div>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="section-title">Rates &amp; Membership</h1>
-        <p className="text-gray-500 mb-10">2026 Season</p>
+        <h1 className="section-title">Rates</h1>
+        <p className="text-gray-500 mb-6">2026 Season</p>
+        <Link
+          href="/memberships"
+          className="flex items-center justify-between max-w-lg mx-auto mb-10 px-5 py-3 rounded-xl bg-gradient-to-r from-swan-green to-swan-green-light text-white shadow-md hover:shadow-lg transition-all group"
+        >
+          <span className="font-semibold text-sm">Looking for a seasonal membership?</span>
+          <svg className="w-5 h-5 text-swan-gold group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </Link>
         <h2 className="section-title text-center">Daily Green Fees</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-lg mx-auto">
           <div className="card text-center">
@@ -45,7 +54,7 @@ export default function RatesPage() {
       {/* Cart & Equipment Rentals */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title text-center">Cart &amp; Equipment Rentals</h2>
+          <h2 className="section-title text-center">Cart &amp; Equipment Fees</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Member Cart Rates */}
@@ -102,25 +111,55 @@ export default function RatesPage() {
           </div>
 
           {/* Other Rentals */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+            <div className="card">
+              <h3 className="font-bold text-lg text-swan-green mb-4">Other Cart Fees</h3>
+              <table className="w-full text-left">
+                <tbody className="text-gray-700">
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4">Pull cart rental</td>
+                    <td className="py-3 font-semibold text-right">$3.00</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 pr-4">Personal cart drop fee</td>
+                    <td className="py-3 font-semibold text-right">$20.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="card">
+              <h3 className="font-bold text-lg text-swan-green mb-4">Club Rentals</h3>
+              <table className="w-full text-left">
+                <tbody className="text-gray-700">
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4">9 Holes</td>
+                    <td className="py-3 font-semibold text-right">$15.00</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 pr-4">18 Holes</td>
+                    <td className="py-3 font-semibold text-right">$20.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Private Cart Storage */}
           <div className="card mt-8">
-            <h3 className="font-bold text-lg text-swan-green mb-4">Other Fees</h3>
+            <h3 className="font-bold text-lg text-swan-green mb-4">Private Cart Storage</h3>
             <table className="w-full text-left">
               <tbody className="text-gray-700">
                 <tr className="border-b border-gray-100">
-                  <td className="py-3 pr-4">Personal cart drop fee</td>
-                  <td className="py-3 font-semibold text-right">$20.00</td>
+                  <td className="py-3 pr-4">Trail fee (seasonal)</td>
+                  <td className="py-3 font-semibold text-right">$120.00</td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="py-3 pr-4">Pull cart rental</td>
-                  <td className="py-3 font-semibold text-right">$3.00</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-3 pr-4">Club rental (9 holes)</td>
-                  <td className="py-3 font-semibold text-right">$15.00</td>
+                  <td className="py-3 pr-4">Gas cart storage (annual)</td>
+                  <td className="py-3 font-semibold text-right">$200.00</td>
                 </tr>
                 <tr>
-                  <td className="py-3 pr-4">Club rental (18 holes)</td>
-                  <td className="py-3 font-semibold text-right">$20.00</td>
+                  <td className="py-3 pr-4">Electric cart storage (annual)</td>
+                  <td className="py-3 font-semibold text-right">$230.00</td>
                 </tr>
               </tbody>
             </table>
@@ -146,89 +185,7 @@ export default function RatesPage() {
         </p>
       </section>
 
-      {/* Memberships */}
-      <section className="bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title text-center">Seasonal Memberships</h2>
-          <p className="text-center text-gray-500 mb-8">Prices include tax. Season: May 1 &ndash; October 31.</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card">
-              <h3 className="font-bold text-lg text-swan-green">Junior Summer Pass</h3>
-              <p className="text-sm text-gray-500 mb-2">Age 18 and under</p>
-              <p className="text-3xl font-bold">$100</p>
-            </div>
-            <div className="card">
-              <h3 className="font-bold text-lg text-swan-green">Young Adult</h3>
-              <p className="text-sm text-gray-500 mb-2">Ages 19&ndash;29</p>
-              <p className="text-3xl font-bold">$445</p>
-            </div>
-            <div className="card">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-swan-green">Single</h3>
-                  <p className="text-3xl font-bold mt-1">$740</p>
-                </div>
-                <span className="bg-swan-gold/20 text-swan-gold-dark text-xs font-semibold px-2 py-1 rounded">
-                  $100 gift card for new members
-                </span>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-swan-green">Household</h3>
-                  <p className="text-3xl font-bold mt-1">$962.50</p>
-                </div>
-                <span className="bg-swan-gold/20 text-swan-gold-dark text-xs font-semibold px-2 py-1 rounded">
-                  $100 gift card for new members
-                </span>
-              </div>
-            </div>
-            <div className="card">
-              <h3 className="font-bold text-lg text-swan-green">Driving Range &mdash; Single</h3>
-              <p className="text-3xl font-bold mt-1">$80</p>
-            </div>
-            <div className="card">
-              <h3 className="font-bold text-lg text-swan-green">Driving Range &mdash; Household</h3>
-              <p className="text-3xl font-bold mt-1">$125</p>
-            </div>
-          </div>
-
-          <p className="text-center text-gray-500 text-sm mt-6">
-            Seniors (75+) receive a 15% discount on membership fees.
-          </p>
-
-          <div className="text-center mt-8">
-            <Link href="/memberships" className="btn-primary text-lg px-8 py-3">
-              Purchase a Membership Online
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Private Cart Storage */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="section-title text-center">Private Cart Storage</h2>
-        <div className="card max-w-lg mx-auto">
-          <table className="w-full text-left">
-            <tbody className="text-gray-700">
-              <tr className="border-b border-gray-100">
-                <td className="py-3 pr-4">Trail fee (seasonal)</td>
-                <td className="py-3 font-semibold text-right">$120.00</td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-3 pr-4">Gas cart storage (annual)</td>
-                <td className="py-3 font-semibold text-right">$200.00</td>
-              </tr>
-              <tr>
-                <td className="py-3 pr-4">Electric cart storage (annual)</td>
-                <td className="py-3 font-semibold text-right">$230.00</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
 }
