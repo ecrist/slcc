@@ -39,7 +39,7 @@ export default function CoursePage() {
       {/* Tee Information */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title">Tee Options</h2>
+          <h2 className="section-title text-center mb-8">Tee Options</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="card text-center">
               <div className="inline-block w-5 h-5 rounded-full bg-blue-600 mb-3"></div>
@@ -68,7 +68,7 @@ export default function CoursePage() {
 
       {/* Scorecard */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="section-title">Scorecard</h2>
+        <h2 className="section-title text-center mb-8">Scorecard</h2>
         <div className="card overflow-x-auto">
           <table className="w-full text-center text-sm">
             <thead>
@@ -127,7 +127,7 @@ export default function CoursePage() {
       {/* Amenities */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title">Amenities</h2>
+          <h2 className="section-title text-center mb-8">Amenities</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="card">
               <h3 className="font-bold text-lg text-swan-green mb-2">Driving Range</h3>

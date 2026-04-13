@@ -308,7 +308,7 @@ export default function TeeTimesPage() {
       <div className="flex flex-wrap gap-2 mb-6">
         {(clubhouseOpen || clubhouseClose) && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-50 text-blue-800 border-blue-200">
-            Clubhouse: {clubhouseOpen ? fmt12h(clubhouseOpen) : "—"} – {clubhouseClose ? fmt12h(clubhouseClose) : "—"}
+            Clubhouse Hours: {clubhouseOpen ? fmt12h(clubhouseOpen) : "—"} – {clubhouseClose ? fmt12h(clubhouseClose) : "—"}
           </div>
         )}
         {(teeTimeOpen || teeTimeClose) && (

@@ -4,31 +4,29 @@ export default function RatesPage() {
   return (
     <div>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="section-title">Rates</h1>
-        <p className="text-gray-500 mb-6">2026 Season</p>
-        <Link
-          href="/memberships"
-          className="flex items-center justify-between max-w-lg mx-auto mb-10 px-5 py-3 rounded-xl bg-gradient-to-r from-swan-green to-swan-green-light text-white shadow-md hover:shadow-lg transition-all group"
-        >
-          <span className="font-semibold text-sm">Looking for a seasonal membership?</span>
-          <svg className="w-5 h-5 text-swan-gold group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-          </svg>
-        </Link>
-        <h2 className="section-title text-center">Daily Green Fees</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-lg mx-auto">
-          <div className="card text-center">
-            <h3 className="font-bold text-lg mb-1">9 Holes</h3>
-            <p className="text-4xl font-bold text-swan-green">$25</p>
-          </div>
-          <div className="card text-center">
-            <h3 className="font-bold text-lg mb-1">18 Holes</h3>
-            <p className="text-4xl font-bold text-swan-green">$35</p>
-          </div>
-        </div>
+        <h1 className="section-title">Rates &amp; Fees</h1>
+        <p className="text-gray-600 mb-2 max-w-2xl">
+          All pricing below reflects the 2026 season and is subject to change. Here you&rsquo;ll find
+          daily green fees, youth rates, cart and equipment rental fees, private cart storage, and driving range pricing.
+        </p>
+        <p className="text-gray-400 text-sm mb-6">2026 Season &bull; Prices include tax where applicable</p>
+        <h2 className="section-title text-center mb-8">Daily Green Fees</h2>
+        <div className="card">
+          <h3 className="font-bold text-lg text-swan-green mb-4">Adult Rates</h3>
+          <table className="w-full text-left">
+            <tbody className="text-gray-700">
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4">9 Holes</td>
+                <td className="py-3 font-semibold text-right">$25.00</td>
+              </tr>
+              <tr>
+                <td className="py-3 pr-4">18 Holes</td>
+                <td className="py-3 font-semibold text-right">$35.00</td>
+              </tr>
+            </tbody>
+          </table>
 
-        <div className="card mt-8">
-          <h3 className="font-bold text-lg text-swan-green mb-4">Youth Rates</h3>
+          <h3 className="font-bold text-lg text-swan-green mt-6 mb-4">Youth Rates</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <tbody className="text-gray-700">
@@ -49,12 +47,21 @@ export default function RatesPage() {
           </div>
           <p className="text-gray-500 text-sm mt-3">Ages 12 &amp; under play free with a paying adult and must golf together.</p>
         </div>
+        <Link
+          href="/memberships"
+          className="flex items-center justify-between mt-8 px-5 py-3 rounded-xl bg-gradient-to-r from-swan-green to-swan-green-light text-white shadow-md hover:shadow-lg transition-all group"
+        >
+          <span className="font-semibold text-sm">Looking for a seasonal membership?</span>
+          <svg className="w-5 h-5 text-swan-gold group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </Link>
       </section>
 
       {/* Cart & Equipment Rentals */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title text-center">Cart &amp; Equipment Fees</h2>
+          <h2 className="section-title text-center mb-8">Cart &amp; Equipment Fees</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Member Cart Rates */}
@@ -169,20 +176,24 @@ export default function RatesPage() {
 
       {/* Driving Range */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="section-title text-center">Driving Range</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-lg mx-auto">
-          <div className="card text-center">
-            <h3 className="font-bold text-lg mb-1">Small Bag</h3>
-            <p className="text-3xl font-bold text-swan-green">$5</p>
-          </div>
-          <div className="card text-center">
-            <h3 className="font-bold text-lg mb-1">Large Bag</h3>
-            <p className="text-3xl font-bold text-swan-green">$7</p>
-          </div>
+        <h2 className="section-title text-center mb-8">Driving Range</h2>
+        <div className="card">
+          <table className="w-full text-left">
+            <tbody className="text-gray-700">
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4">Small Bag</td>
+                <td className="py-3 font-semibold text-right">$5.00</td>
+              </tr>
+              <tr>
+                <td className="py-3 pr-4">Large Bag</td>
+                <td className="py-3 font-semibold text-right">$7.00</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-gray-500 text-sm mt-3">
+            Closed Fridays 8am&ndash;10am in June and July for youth programs.
+          </p>
         </div>
-        <p className="text-center text-gray-500 text-sm mt-4">
-          Closed Fridays 8am&ndash;10am in June and July for youth programs.
-        </p>
       </section>
 
 

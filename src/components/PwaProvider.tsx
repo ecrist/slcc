@@ -57,7 +57,9 @@ export default function PwaProvider() {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-6 md:w-80">
       <div className="bg-swan-dark text-white rounded-2xl shadow-2xl p-4 flex items-start gap-3 border border-swan-gold/20">
-        <img src="/icons/icon.svg" alt="" className="w-12 h-12 rounded-xl shrink-0" />
+        <div className="w-12 h-12 rounded-xl shrink-0 bg-white flex items-center justify-center p-1.5">
+          <img src="/icons/swan-logo.png" alt="Swan Lake CC" className="w-9 h-9 object-contain" />
+        </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">Install Swan Lake CC</p>
           <p className="text-white/60 text-xs mt-0.5">Add to your home screen for quick access.</p>

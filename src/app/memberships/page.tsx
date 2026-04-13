@@ -135,6 +135,7 @@ export default function MembershipsPage() {
   const displayTypes = Object.entries(MEMBERSHIP_TYPES) as [MembershipType, typeof MEMBERSHIP_TYPES[MembershipType]][];
 
   return (
+    <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h1 className="section-title">Annual Memberships</h1>
       <p className="text-gray-600 mb-10 max-w-2xl">
@@ -166,8 +167,71 @@ export default function MembershipsPage() {
         ))}
       </div>
 
-      {/* Modal */}
-      {selectedType && (
+    </div>
+    <section className="bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <h2 className="section-title text-center mb-8">Member Information</h2>
+        {/* Member Days & Times */}
+        <div className="card mb-8">
+          <h2 className="font-bold text-xl text-swan-green mb-4">Member Days &amp; Times</h2>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="py-3 pr-4 font-semibold text-gray-700">Day</th>
+                <th className="py-3 pr-4 font-semibold text-gray-700">Time</th>
+                <th className="py-3 font-semibold text-gray-700">Event</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-600">
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4 font-medium">Monday</td>
+                <td className="py-3 pr-4">4:30pm &ndash; 5:30pm</td>
+                <td className="py-3">Ladies&rsquo; Club <span className="text-gray-400 text-sm">(through August)</span></td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4 font-medium">Tuesday</td>
+                <td className="py-3 pr-4">Opening &ndash; 12:00pm</td>
+                <td className="py-3">Senior Men&rsquo;s Club <span className="text-gray-400 text-sm">(through August)</span></td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4 font-medium">Wednesday</td>
+                <td className="py-3 pr-4">Opening &ndash; 1:00pm</td>
+                <td className="py-3">Ladies&rsquo; Club <span className="text-gray-400 text-sm">(through August)</span></td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4 font-medium">Wednesday</td>
+                <td className="py-3 pr-4">4:30pm &ndash; 5:30pm</td>
+                <td className="py-3">Little Dogs Scramble <span className="text-gray-400 text-sm">(sign up by 4:00pm each Wednesday)</span></td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="py-3 pr-4 font-medium">Thursday</td>
+                <td className="py-3 pr-4">11:00am &ndash; Close</td>
+                <td className="py-3">Men&rsquo;s Club <span className="text-gray-400 text-sm">(through August)</span></td>
+              </tr>
+              <tr>
+                <td className="py-3 pr-4 font-medium">Friday</td>
+                <td className="py-3 pr-4">8:00am &ndash; 10:00am</td>
+                <td className="py-3">Youth Golf Program <span className="text-gray-400 text-sm">(June &amp; July)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Ladies League */}
+        <div className="card">
+          <h2 className="font-bold text-xl text-swan-green mb-4">Ladies League Information</h2>
+          <p className="text-gray-600">
+            For SLCC Ladies League info and calendar, please{" "}
+            <a href="https://cdn.prod.website-files.com/62164adfeaffe62555ecab49/67edc8ed516198e28c414c41_Swan%20Lake%20Ladies%202025%20Letter.pdf" target="_blank" rel="noopener noreferrer" className="text-swan-green font-medium hover:underline">
+              click here
+            </a>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {/* Modal */}
+    {selectedType && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg my-8 relative">
             {/* Modal header */}
@@ -347,7 +411,7 @@ export default function MembershipsPage() {
             </div>
           </div>
         </div>
-      )}
-    </div>
+    )}
+    </>
   );
 }
