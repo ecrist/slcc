@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
     const tempPassword = uuidv4().slice(0, 12);
     const hash = await bcrypt.hash(tempPassword, 12);
     const newUser = await queryOne<{ id: number }>(
-      "INSERT INTO users (email, name, password_hash, phone) VALUES ($1, $2, $3, $4) RETURNING id",
-      [normalizedEmail, `${first_name} ${last_name}`.trim(), hash, phone || null]
+      "INSERT INTO users (email, first_name, last_name, name, password_hash, phone) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
+      [normalizedEmail, first_name.trim(), last_name.trim(), `${first_name} ${last_name}`.trim(), hash, phone || null]
     );
     if (newUser) {
       userId = newUser.id;

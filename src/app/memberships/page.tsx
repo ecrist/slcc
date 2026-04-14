@@ -33,17 +33,22 @@ export default function MembershipsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Pre-fill form from logged-in user
+  // Pre-fill form from logged-in user — fetch first/last directly from profile API
   useEffect(() => {
-    if (session?.user) {
-      const nameParts = (session.user.name || "").split(" ");
-      setForm((prev) => ({
-        ...prev,
-        first_name: prev.first_name || nameParts[0] || "",
-        last_name: prev.last_name || nameParts.slice(1).join(" ") || "",
-        email: prev.email || session.user?.email || "",
-      }));
-    }
+    if (!session?.user) return;
+    fetch("/api/user/settings")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        setForm((prev) => ({
+          ...prev,
+          first_name: prev.first_name || data.first_name || "",
+          last_name:  prev.last_name  || data.last_name  || "",
+          email:      prev.email      || data.email       || "",
+          phone:      prev.phone      || data.phone       || "",
+        }));
+      })
+      .catch(() => {});
   }, [session]);
 
   // Reset add-on when changing membership type

@@ -357,8 +357,8 @@ async function migrate() {
       const adminPassword = process.env.ADMIN_PASSWORD ?? "admin";
       const passwordHash = await bcrypt.hash(adminPassword, 12);
       await client.query(
-        "INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-        ["admin@swanlakecc.com", "Admin", passwordHash]
+        "INSERT INTO users (email, first_name, last_name, name, password_hash) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING",
+        ["admin@swanlakecc.com", "Admin", "", "Admin", passwordHash]
       );
       await client.query(
         "INSERT INTO admin_users (email, added_by) VALUES ($1, 'system') ON CONFLICT DO NOTHING",
