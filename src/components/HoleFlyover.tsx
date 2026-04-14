@@ -32,12 +32,25 @@ function ChevronRight() {
 export default function HoleFlyover() {
   const [active, setActive] = useState(0)
   const [fading, setFading] = useState(false)
+  // navCount increments on every goTo() call — used to key iframes so
+  // each navigation creates a fresh iframe, and to track "has navigated"
+  const [navCount, setNavCount] = useState(0)
+  // Tracks whether the user dismissed the hole-1 play overlay manually
+  const [hole1OverlayVisible, setHole1OverlayVisible] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const hasNavigated = useRef(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  // After any navigation, all holes autoplay (including hole 1 on return visits)
+  const autoplay = navCount > 0 || active !== 0
+  // Show play overlay only on the very first hole-1 view, before user interacts
+  const showPlayOverlay = active === 0 && navCount === 0 && hole1OverlayVisible
+  // Unique key per navigation so each hole visit gets a fresh iframe
+  const iframeKey = `${active}-${navCount}`
+  const src = `https://player.vimeo.com/video/${holes[active].vimeoId}?title=0&byline=0&portrait=0&color=c9a84c${autoplay ? '&autoplay=1&muted=1' : ''}`
 
   function goTo(i: number) {
     if (i === active) return
-    hasNavigated.current = true
+    setNavCount(n => n + 1)
     clearTimeout(timer.current)
     setFading(true)
     timer.current = setTimeout(() => {
@@ -46,7 +59,16 @@ export default function HoleFlyover() {
     }, 220)
   }
 
-  // Keyboard navigation — functional update avoids stale closure
+  // Play hole 1 without reloading the iframe — send postMessage play command
+  function playHole1() {
+    setHole1OverlayVisible(false)
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ method: 'play' }),
+      'https://player.vimeo.com'
+    )
+  }
+
+  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft')  setActive(a => (a - 1 + 9) % 9)
@@ -56,10 +78,35 @@ export default function HoleFlyover() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // Auto-advance when a video finishes via Vimeo postMessage API
+  useEffect(() => {
+    // Register for the finish event once the player is ready
+    function register() {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ method: 'addEventListener', value: 'finish' }),
+        'https://player.vimeo.com'
+      )
+    }
+    // Attempt after a short delay in case the player is already loaded
+    const t = setTimeout(register, 1500)
+
+    function handleMessage(e: MessageEvent) {
+      if (typeof e.data !== 'string' || !e.origin.includes('vimeo')) return
+      try {
+        const data = JSON.parse(e.data)
+        if (data.event === 'ready') register()
+        if (data.event === 'finish') goTo((active + 1) % 9)
+      } catch { /* non-JSON message, ignore */ }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('message', handleMessage)
+    }
+  }, [active]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const hole = holes[active]
-  // Hole 1 paused on initial page load only; autoplay when navigating back to it
-  const autoplay = active !== 0 || hasNavigated.current
-  const src = `https://player.vimeo.com/video/${hole.vimeoId}?title=0&byline=0&portrait=0&color=c9a84c${autoplay ? '&autoplay=1&muted=1' : ''}`
 
   return (
     <section className="bg-swan-dark py-16">
@@ -67,21 +114,13 @@ export default function HoleFlyover() {
 
         {/* Header */}
         <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold text-swan-gold mb-1">Hole Flyover</h2>
+          <h2 className="text-3xl font-bold text-swan-gold mb-1">Hole-By-Hole</h2>
           <p className="text-gray-500 text-sm tracking-wide">Drone footage &middot; All 9 holes</p>
         </div>
 
-        {/* Hole tabs + prev/next row */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => goTo((active - 1 + 9) % 9)}
-            aria-label="Previous hole"
-            className="flex-shrink-0 w-9 h-9 rounded-full border border-white/20 text-gray-400 flex items-center justify-center hover:border-swan-gold hover:text-swan-gold transition-all duration-200"
-          >
-            <ChevronLeft />
-          </button>
-
-          <div className="flex gap-1 flex-1 justify-center overflow-x-auto no-scrollbar">
+        {/* Hole tabs */}
+        <div className="flex justify-center py-4 mb-2">
+          <div className="flex gap-1 overflow-x-auto no-scrollbar px-2 py-2">
             {holes.map((h, i) => (
               <button
                 key={h.hole}
@@ -97,14 +136,6 @@ export default function HoleFlyover() {
               </button>
             ))}
           </div>
-
-          <button
-            onClick={() => goTo((active + 1) % 9)}
-            aria-label="Next hole"
-            className="flex-shrink-0 w-9 h-9 rounded-full border border-white/20 text-gray-400 flex items-center justify-center hover:border-swan-gold hover:text-swan-gold transition-all duration-200"
-          >
-            <ChevronRight />
-          </button>
         </div>
 
         {/* Video + overlaid arrows */}
@@ -121,8 +152,28 @@ export default function HoleFlyover() {
             className="relative aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/60 ring-1 ring-white/10"
             style={{ opacity: fading ? 0 : 1, transition: 'opacity 220ms ease-in-out' }}
           >
+            {/* Hole 1 play overlay — shown only before the user has interacted */}
+            {showPlayOverlay && (
+              <div
+                role="button"
+                aria-label="Play Hole 1 flyover"
+                onClick={playHole1}
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 cursor-pointer bg-black/40"
+              >
+                <div className="w-20 h-20 rounded-full bg-swan-gold flex items-center justify-center shadow-2xl hover:bg-swan-gold-light transition-colors duration-200">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-9 h-9 text-swan-dark ml-1">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                <span className="text-white text-sm font-semibold tracking-widest uppercase drop-shadow-lg">
+                  Watch Flyover
+                </span>
+              </div>
+            )}
+
             <iframe
-              key={active}
+              ref={iframeRef}
+              key={iframeKey}
               src={src}
               title={`Hole ${hole.hole} flyover`}
               className="absolute inset-0 w-full h-full"
@@ -170,25 +221,6 @@ export default function HoleFlyover() {
         {/* Hole description */}
         <p className="mt-4 text-gray-400 text-sm leading-relaxed px-1">{hole.description}</p>
 
-        {/* Progress dots */}
-        <div className="flex items-center justify-center gap-1.5 mt-8">
-          {holes.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              aria-label={`Go to hole ${i + 1}`}
-              className={`rounded-full transition-all duration-300 ${
-                i === active
-                  ? 'w-7 h-2 bg-swan-gold'
-                  : 'w-2 h-2 bg-white/20 hover:bg-white/40'
-              }`}
-            />
-          ))}
-        </div>
-
-        <p className="text-center text-gray-700 text-xs mt-4 select-none">
-          Use ← → arrow keys to navigate
-        </p>
 
       </div>
     </section>

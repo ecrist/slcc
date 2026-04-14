@@ -275,6 +275,12 @@ NFC cards: UUID token stored on membership (`nfc_token`). iOS uses tap-to-open U
 - **Tee Options:** Championship, Men's, Ladies with yardage and slope/rating
 - **Scorecard:** Hole-by-hole par and yardage; Holes 1 and 8 show par as "4/5" with footnote explaining separate men's/ladies par
 - **Amenities:** Course features and facilities
+- **Hole-By-Hole Flyover** (`src/components/HoleFlyover.tsx`): Vimeo drone video player for all 9 holes
+  - Numbered tab row (1–9) with gold active indicator; arrow buttons overlaid on video sides; keyboard arrow key support
+  - Hole 1 loads paused with a prominent gold play button overlay; holes 2–9 autoplay on navigation
+  - Videos auto-advance to the next hole when finished; hole 9 loops back to hole 1
+  - Fade transition (220 ms) between holes; fresh iframe keyed per navigation
+  - Displays hole stats (par, handicap, Blue/White/Red yardage) and per-hole description text
 
 ### Rates (`/rates`)
 - **Rates & Fees** title with descriptive subtitle

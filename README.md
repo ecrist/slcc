@@ -103,6 +103,7 @@ Admin tools: run/re-run draw, bulk-assign tee times to teams, inline score entry
 - Tee options (Championship, Men's, Ladies) with yardage and slope/rating
 - Course amenities and features
 - Notes: Holes 1 and 8 have separate men's (4) and ladies (5) par
+- **Hole-By-Hole flyover** (`HoleFlyover` component): interactive Vimeo drone video player for all 9 holes with tab/arrow navigation, fade transitions, hole stats (par, handicap, yardage by tee), descriptions, auto-advance on video end, and a play overlay on Hole 1's initial load
 
 ### Rates (`/rates`)
 
