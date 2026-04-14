@@ -18,7 +18,8 @@ export default function SettingsPage() {
   const { data: session, status, update: updateSession } = useSession();
   const router = useRouter();
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -39,7 +40,10 @@ export default function SettingsPage() {
       fetch("/api/user/settings")
         .then((r) => r.json())
         .then((data) => {
-          setName(data.name || "");
+          // Split stored full name into first / last
+          const parts = (data.name || "").trim().split(/\s+/);
+          setFirstName(parts[0] || "");
+          setLastName(parts.slice(1).join(" ") || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
           if (data.membership) setMembership(data.membership);
@@ -60,13 +64,18 @@ export default function SettingsPage() {
 
   async function handleProfileSave(e: React.FormEvent) {
     e.preventDefault();
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) return;
     setSaving(true);
     setMessage(null);
 
     const res = await fetch("/api/user/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, phone }),
+      body: JSON.stringify({
+        name: `${firstName.trim()} ${lastName.trim()}`,
+        email,
+        phone,
+      }),
     });
 
     const data = await res.json();
@@ -121,12 +130,8 @@ export default function SettingsPage() {
 
   if (!session) return null;
 
-  const initials = (session.user?.name || session.user?.email || "?")
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase() ||
+    (session.user?.email?.[0] || "?").toUpperCase();
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -138,7 +143,9 @@ export default function SettingsPage() {
           {initials}
         </div>
         <div>
-          <p className="text-xl font-semibold text-gray-900">{session.user?.name}</p>
+          <p className="text-xl font-semibold text-gray-900">
+            {firstName || lastName ? `${firstName} ${lastName}`.trim() : session.user?.email}
+          </p>
           <p className="text-gray-500 text-sm">{session.user?.email}</p>
           {memberSince && (
             <p className="text-gray-400 text-xs mt-0.5">Account created {memberSince}</p>
@@ -147,13 +154,11 @@ export default function SettingsPage() {
       </div>
 
       {message && (
-        <div
-          className={`mb-6 px-4 py-3 rounded-lg text-sm font-medium ${
-            message.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
-        >
+        <div className={`mb-6 px-4 py-3 rounded-lg text-sm font-medium ${
+          message.type === "success"
+            ? "bg-green-50 text-green-800 border border-green-200"
+            : "bg-red-50 text-red-800 border border-red-200"
+        }`}>
           {message.text}
         </div>
       )}
@@ -164,7 +169,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-lg text-swan-green">Membership</h2>
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-              membership.status === "active" ? "bg-green-100 text-green-800" :
+              membership.status === "active"  ? "bg-green-100 text-green-800" :
               membership.status === "pending" ? "bg-yellow-100 text-yellow-800" :
               "bg-gray-100 text-gray-800"
             }`}>
@@ -205,22 +210,37 @@ export default function SettingsPage() {
       <div className="card mb-8">
         <h2 className="font-bold text-lg text-swan-green mb-4">Profile</h2>
         <form onSubmit={handleProfileSave} className="space-y-4">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none"
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none"
+                required
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
+              Email Address <span className="text-red-500">*</span>
             </label>
             <input
               id="email"
@@ -247,7 +267,7 @@ export default function SettingsPage() {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !firstName.trim() || !lastName.trim() || !email.trim()}
               className="btn-primary py-2 px-6 text-sm disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Profile"}
