@@ -32,7 +32,7 @@ function ChevronRight() {
 export default function HoleFlyover() {
   const [active, setActive] = useState(0)
   const [fading, setFading] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const hasNavigated = useRef(false)
 
   function goTo(i: number) {
