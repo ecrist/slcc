@@ -2,15 +2,15 @@
 import { useState, useEffect, useRef } from 'react'
 
 const holes = [
-  { hole: 1, par: '4/5', hcp: 2,  blue: 430, white: 414, red: 388, vimeoId: '929585072' },
-  { hole: 2, par: 3,     hcp: 3,  blue: 196, white: 162, red: 141, vimeoId: '929585190' },
-  { hole: 3, par: 4,     hcp: 6,  blue: 358, white: 337, red: 270, vimeoId: '929585243' },
-  { hole: 4, par: 5,     hcp: 5,  blue: 460, white: 444, red: 401, vimeoId: '929585276' },
-  { hole: 5, par: 3,     hcp: 9,  blue: 154, white: 142, red: 120, vimeoId: '929585376' },
-  { hole: 6, par: 4,     hcp: 8,  blue: 354, white: 333, red: 309, vimeoId: '929585426' },
-  { hole: 7, par: 4,     hcp: 7,  blue: 323, white: 315, red: 307, vimeoId: '929585463' },
-  { hole: 8, par: '4/5', hcp: 1,  blue: 455, white: 437, red: 416, vimeoId: '929585498' },
-  { hole: 9, par: 5,     hcp: 4,  blue: 505, white: 495, red: 400, vimeoId: '929585538' },
+  { hole: 1, par: '4/5', hcp: 2, blue: 430, white: 414, red: 388, vimeoId: '929585072', description: "The starting hole requires an accurate drive, as OB borders the left hand side. The rough on either side of the fairway are scattered with many trees. A par on the opening hole is always a great score to start your round." },
+  { hole: 2, par: 3,     hcp: 3, blue: 196, white: 162, red: 141, vimeoId: '929585190', description: "This par 3 can be deceiving off the tee. Choose your club wisely to carry onto the green. Short has a chance of rolling onto the green. Long and left is unwise." },
+  { hole: 3, par: 4,     hcp: 6, blue: 358, white: 337, red: 270, vimeoId: '929585243', description: "A picturesque tee shot from the White and Blue tees. Playing your drive slightly over the large grouping of trees on the right will give you the best look into the green for your second shot." },
+  { hole: 4, par: 5,     hcp: 5, blue: 460, white: 444, red: 401, vimeoId: '929585276', description: "A true risk/reward par 5. Depending on your distance off the tee can leave you with a look at going for the green in two. Laying up into the fairway past the creek is a sensible shot." },
+  { hole: 5, par: 3,     hcp: 9, blue: 154, white: 142, red: 120, vimeoId: '929585376', description: "Don't let the holes handicap fool you. This downhill par 3 with a demanding back to front sloping green will often leave you scratching your head as to whether you picked the correct club." },
+  { hole: 6, par: 4,     hcp: 8, blue: 354, white: 333, red: 309, vimeoId: '929585426', description: "Straight away par 4. Grip it and rip it down the fairway. Try to get on the green in two, two putt at most, and grab a cold one and a hot dog at the 'Sugar Shack'." },
+  { hole: 7, par: 4,     hcp: 7, blue: 323, white: 315, red: 307, vimeoId: '929585463', description: "Watch out for the tree in the fairway on the left and the tree just in the rough on the right. With the trees, large breaks on the green, and pressure from the gallery at the clubhouse - this hole can be trickier than it looks." },
+  { hole: 8, par: '4/5', hcp: 1, blue: 455, white: 437, red: 416, vimeoId: '929585498', description: "A monster of a par 4 (Blues/Whites), this hole doglegs to the the right with OB threatening you behind the green. The more accurate your drive is off the tee the better of a chance you have with getting out of this hole with a par or better." },
+  { hole: 9, par: 5,     hcp: 4, blue: 505, white: 495, red: 400, vimeoId: '929585538', description: "Avoid going too far left off the tee, as OB lines the road to the left. Don't forget to ring the bell on the right hand side of the hole as you pass and enjoy the tall Norway pines behind the green. How about another 9?" },
 ]
 
 function ChevronLeft() {
@@ -166,6 +166,9 @@ export default function HoleFlyover() {
             </div>
           </div>
         </div>
+
+        {/* Hole description */}
+        <p className="mt-4 text-gray-400 text-sm leading-relaxed px-1">{hole.description}</p>
 
         {/* Progress dots */}
         <div className="flex items-center justify-center gap-1.5 mt-8">
