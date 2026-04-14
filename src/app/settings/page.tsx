@@ -40,10 +40,8 @@ export default function SettingsPage() {
       fetch("/api/user/settings")
         .then((r) => r.json())
         .then((data) => {
-          // Split stored full name into first / last
-          const parts = (data.name || "").trim().split(/\s+/);
-          setFirstName(parts[0] || "");
-          setLastName(parts.slice(1).join(" ") || "");
+          setFirstName(data.first_name || "");
+          setLastName(data.last_name || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
           if (data.membership) setMembership(data.membership);
@@ -72,7 +70,8 @@ export default function SettingsPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: `${firstName.trim()} ${lastName.trim()}`,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         email,
         phone,
       }),

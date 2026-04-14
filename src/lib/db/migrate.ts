@@ -253,10 +253,22 @@ async function migrate() {
       "ALTER TABLE memberships ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
       // Add phone to users for profile completeness
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
+      // Split name into first_name / last_name
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT NOT NULL DEFAULT ''",
     ];
     for (const sql of alterations) {
       await client.query(sql);
     }
+
+    // ── Backfill: split users.name → first_name / last_name ──────────────────
+    await client.query(`
+      UPDATE users
+      SET
+        first_name = CASE WHEN name LIKE '% %' THEN split_part(name, ' ', 1) ELSE name END,
+        last_name  = CASE WHEN name LIKE '% %' THEN trim(substring(name FROM position(' ' IN name))) ELSE '' END
+      WHERE first_name = ''
+    `);
 
     // ── Backfill: link memberships to users by email ─────────────────────────
     await client.query(`

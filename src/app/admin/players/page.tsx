@@ -6,7 +6,8 @@ import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 interface Player {
   id: number;
   email: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   phone: string | null;
   created_at: string;
   membership_id: number | null;
@@ -72,6 +73,10 @@ export default function PlayersPage() {
   }
 
   // ── Password reset ────────────────────────────────────────────────────────
+  function fullName(p: Player) {
+    return `${p.first_name} ${p.last_name}`.trim();
+  }
+
   function openReset(p: Player) {
     setResetUser(p);
     setNewPassword("");
@@ -88,7 +93,7 @@ export default function PlayersPage() {
     setResetting(false);
     if (res.ok) {
       setResetUser(null);
-      flash("success", `Password reset for ${resetUser.name}.`);
+      flash("success", `Password reset for ${fullName(resetUser)}.`);
     } else {
       flash("error", "Failed to reset password.");
     }
@@ -104,15 +109,12 @@ export default function PlayersPage() {
     if (!addMemberUser) return;
     setAddingMember(true);
 
-    const [firstName, ...rest] = addMemberUser.name.split(" ");
-    const lastName = rest.join(" ") || firstName;
-
     const res = await fetch("/api/memberships", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        first_name: firstName,
-        last_name: lastName,
+        first_name: addMemberUser.first_name,
+        last_name: addMemberUser.last_name,
         email: addMemberUser.email,
         phone: memberForm.phone || null,
         address: memberForm.address || null,
@@ -142,7 +144,7 @@ export default function PlayersPage() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="flex items-center justify-between mb-6">
         <h1 className="section-title">Players</h1>
-        <span className="text-sm text-gray-500">{players.length} account{players.length !== 1 ? "s" : ""}</span>
+        <span className="text-sm text-gray-500">{players.length} player{players.length !== 1 ? "s" : ""}</span>
       </div>
 
       {msg && (
@@ -181,7 +183,7 @@ export default function PlayersPage() {
             <tbody className="divide-y divide-gray-100">
               {players.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{p.name}</td>
+                  <td className="px-4 py-3 font-medium">{fullName(p)}</td>
                   <td className="px-4 py-3 text-gray-600">{p.email}</td>
                   <td className="px-4 py-3 text-gray-500">{p.phone ?? "—"}</td>
 
@@ -255,7 +257,7 @@ export default function PlayersPage() {
               <button onClick={() => setResetUser(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Set a new password for <strong>{resetUser.name}</strong> ({resetUser.email}).
+              Set a new password for <strong>{fullName(resetUser)}</strong> ({resetUser.email}).
             </p>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">New Password (min 6 chars)</label>
@@ -293,7 +295,7 @@ export default function PlayersPage() {
               <button onClick={() => setAddMemberUser(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Creating membership for <strong>{addMemberUser.name}</strong> ({addMemberUser.email}).
+              Creating membership for <strong>{fullName(addMemberUser)}</strong> ({addMemberUser.email}).
             </p>
 
             <div className="space-y-3">

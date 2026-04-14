@@ -10,7 +10,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,7 +31,12 @@ function RegisterForm() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+      body: JSON.stringify({
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        password: form.password,
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -48,7 +53,6 @@ function RegisterForm() {
     });
     setSubmitting(false);
     if (result?.error) {
-      // Created but couldn't auto-sign-in — send to login
       router.push("/login?registered=1");
     } else {
       router.push(callbackUrl);
@@ -70,16 +74,29 @@ function RegisterForm() {
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-            <input
-              type="text"
-              required
-              autoComplete="name"
-              className="input-field"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+              <input
+                type="text"
+                required
+                autoComplete="given-name"
+                className="input-field"
+                value={form.first_name}
+                onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+              <input
+                type="text"
+                required
+                autoComplete="family-name"
+                className="input-field"
+                value={form.last_name}
+                onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+              />
+            </div>
           </div>
 
           <div>

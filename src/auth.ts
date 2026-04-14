@@ -33,11 +33,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth(async () => {
         // changes show up without requiring a new login.
         if (token.id && (trigger === "update" || !user)) {
           const fresh = await queryOne<{ name: string; email: string }>(
-            "SELECT name, email FROM users WHERE id = $1",
+            "SELECT first_name || ' ' || last_name AS name, email FROM users WHERE id = $1",
             [token.id]
           );
           if (fresh) {
-            token.name = fresh.name;
+            token.name = fresh.name.trim();
             token.email = fresh.email;
           }
         }
@@ -61,19 +61,25 @@ export const { auth, handlers, signIn, signOut } = NextAuth(async () => {
           if (!credentials?.email || !credentials?.password) return null;
           const user = await queryOne<{
             id: number;
-            name: string;
+            first_name: string;
+            last_name: string;
             email: string;
             password_hash: string;
-          }>("SELECT * FROM users WHERE email = $1", [
-            (credentials.email as string).trim().toLowerCase(),
-          ]);
+          }>(
+            "SELECT id, first_name, last_name, email, password_hash FROM users WHERE email = $1",
+            [(credentials.email as string).trim().toLowerCase()]
+          );
           if (!user) return null;
           const valid = await bcrypt.compare(
             credentials.password as string,
             user.password_hash
           );
           if (!valid) return null;
-          return { id: String(user.id), name: user.name, email: user.email };
+          return {
+            id: String(user.id),
+            name: `${user.first_name} ${user.last_name}`.trim(),
+            email: user.email,
+          };
         },
       }),
       // Only include OAuth providers when credentials are configured

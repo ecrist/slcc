@@ -11,13 +11,15 @@ export async function GET() {
 
   const user = await queryOne<{
     id: number;
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     phone: string | null;
     created_at: string;
-  }>("SELECT id, name, email, phone, created_at FROM users WHERE id = $1", [
-    session.user.id,
-  ]);
+  }>(
+    "SELECT id, first_name, last_name, email, phone, created_at FROM users WHERE id = $1",
+    [session.user.id]
+  );
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -47,16 +49,35 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json();
-  const { name, email, phone, currentPassword, newPassword } = body;
+  const { first_name, last_name, email, phone, currentPassword, newPassword } = body;
 
-  // Build update fields
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
   let paramIndex = 1;
 
-  if (name && typeof name === "string" && name.trim()) {
+  if (first_name && typeof first_name === "string" && first_name.trim()) {
+    updates.push(`first_name = $${paramIndex++}`);
+    values.push(first_name.trim());
+  }
+
+  if (last_name && typeof last_name === "string" && last_name.trim()) {
+    updates.push(`last_name = $${paramIndex++}`);
+    values.push(last_name.trim());
+  }
+
+  // Keep the legacy name column in sync
+  if (
+    (first_name && first_name.trim()) ||
+    (last_name && last_name.trim())
+  ) {
+    const current = await queryOne<{ first_name: string; last_name: string }>(
+      "SELECT first_name, last_name FROM users WHERE id = $1",
+      [session.user.id]
+    );
+    const fn = (first_name?.trim() || current?.first_name || "").trim();
+    const ln = (last_name?.trim() || current?.last_name || "").trim();
     updates.push(`name = $${paramIndex++}`);
-    values.push(name.trim());
+    values.push(`${fn} ${ln}`.trim());
   }
 
   if (email && typeof email === "string" && email.trim()) {
@@ -66,10 +87,7 @@ export async function PATCH(req: Request) {
       [normalizedEmail, session.user.id]
     );
     if (existing) {
-      return NextResponse.json(
-        { error: "Email is already in use" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "Email is already in use" }, { status: 409 });
     }
     updates.push(`email = $${paramIndex++}`);
     values.push(normalizedEmail);
@@ -103,10 +121,7 @@ export async function PATCH(req: Request) {
     }
     const valid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!valid) {
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Current password is incorrect" }, { status: 403 });
     }
 
     const hash = await bcrypt.hash(newPassword, 12);
@@ -119,11 +134,13 @@ export async function PATCH(req: Request) {
   }
 
   values.push(Number(session.user.id));
-  const sql = `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING id, name, email, phone, created_at`;
+  const sql = `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex}
+               RETURNING id, first_name, last_name, email, phone, created_at`;
 
   const updated = await queryOne<{
     id: number;
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     phone: string | null;
     created_at: string;

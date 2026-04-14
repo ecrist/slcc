@@ -19,14 +19,16 @@ export async function GET(request: NextRequest) {
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const where = q.length >= 2
-    ? `WHERE u.name ILIKE $1 OR u.email ILIKE $1`
+    ? `WHERE u.first_name ILIKE $1 OR u.last_name ILIKE $1
+          OR (u.first_name || ' ' || u.last_name) ILIKE $1
+          OR u.email ILIKE $1`
     : "";
   const params = q.length >= 2 ? [`%${q}%`] : [];
 
   // DISTINCT ON gives us one row per user — the most recent membership
   const rows = await query(
     `SELECT DISTINCT ON (u.id)
-       u.id, u.email, u.name, u.phone, u.created_at,
+       u.id, u.email, u.first_name, u.last_name, u.phone, u.created_at,
        m.id            AS membership_id,
        m.member_number,
        m.membership_type,

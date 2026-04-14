@@ -3,16 +3,22 @@ import bcrypt from "bcryptjs";
 import { queryOne, execute } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
-  const { name, email, password } = await request.json();
+  const { first_name, last_name, email, password } = await request.json();
 
-  if (!name || !email || !password) {
-    return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
+  if (!first_name || !last_name || !email || !password) {
+    return NextResponse.json(
+      { error: "First name, last name, email, and password are required" },
+      { status: 400 }
+    );
   }
   if (typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
   }
   if (typeof password !== "string" || password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Password must be at least 8 characters" },
+      { status: 400 }
+    );
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -22,13 +28,23 @@ export async function POST(request: NextRequest) {
     [normalizedEmail]
   );
   if (existing) {
-    return NextResponse.json({ error: "An account with that email already exists" }, { status: 409 });
+    return NextResponse.json(
+      { error: "An account with that email already exists" },
+      { status: 409 }
+    );
   }
 
   const hash = await bcrypt.hash(password, 12);
   const newUser = await queryOne<{ id: number }>(
-    "INSERT INTO users (email, name, password_hash) VALUES ($1,$2,$3) RETURNING id",
-    [normalizedEmail, name.trim(), hash]
+    `INSERT INTO users (email, first_name, last_name, name, password_hash)
+     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+    [
+      normalizedEmail,
+      first_name.trim(),
+      last_name.trim(),
+      `${first_name.trim()} ${last_name.trim()}`,
+      hash,
+    ]
   );
 
   // Auto-link any existing memberships with this email
