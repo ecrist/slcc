@@ -38,3 +38,8 @@
     @apply text-3xl font-bold text-swan-green mb-2;
   }
 }
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+}

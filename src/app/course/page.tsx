@@ -1,3 +1,5 @@
+import HoleFlyover from '@/components/HoleFlyover'
+
 export default function CoursePage() {
   const scorecard = [
     { hole: 1, par: "4/5", hcp: 2, blue: 430, white: 414, red: 388 },
@@ -35,6 +37,9 @@ export default function CoursePage() {
           </p>
         </div>
       </section>
+
+      {/* Hole Flyover */}
+      <HoleFlyover />
 
       {/* Tee Information */}
       <section className="bg-gray-50">
