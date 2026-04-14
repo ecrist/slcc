@@ -60,9 +60,23 @@ Six tiers matching current Swan Lake CC pricing:
 | Driving Range Pass – Single | $80 |
 | Driving Range Pass – Household | $125 |
 
+**Driving range add-on:** Young Adult, Single, and Household tiers can bundle a driving range pass at checkout (Single: +$80, Household: +$125). Standalone range passes are also available.
+
 Payment options: Google Pay, Apple Pay, credit/debit card (Square), or invoice/ACH (QuickBooks).
 
 Members can opt in to **auto-renewal** at checkout — card is tokenized via Square Card on File, never stored raw.
+
+**Membership ↔ account linking:** Memberships are linked to user accounts via `user_id`. When a logged-in user purchases a membership, it's automatically linked. When a user registers with an email that matches an existing membership, it's auto-linked. When an admin creates a membership for a non-existing user, an account is auto-created and an invite email is sent.
+
+**Member Information section:** Below the membership cards, a "Member Information" section displays Member Days & Times (weekly schedule) and Ladies League information with PDF link.
+
+### Account Settings (`/settings`)
+
+Authenticated users can manage their profile:
+
+- **Profile:** Edit name, email, phone number
+- **Password:** Change password (requires current password verification)
+- **Membership info:** View linked membership details (member number, type, status, season, payment) or link to purchase page
 
 ### Tournaments (`/tournaments`)
 
@@ -77,11 +91,33 @@ Six formats:
 
 Admin tools: run/re-run draw, bulk-assign tee times to teams, inline score entry, auto-ranked leaderboard. Leftover players distributed evenly rather than leaving an undersized team.
 
+### About (`/about`)
+
+- Club leadership: Club Manager, Course Superintendent with photos, phone numbers, and year ranges
+- Board of Directors table with name, position, year elected, and phone number
+- Contact buttons: directions (Google Maps), email, phone
+
+### Course (`/course`)
+
+- Golf Course Overview with hole-by-hole scorecard (par, yardage by tee)
+- Tee options (Championship, Men's, Ladies) with yardage and slope/rating
+- Course amenities and features
+- Notes: Holes 1 and 8 have separate men's (4) and ladies (5) par
+
+### Rates (`/rates`)
+
+- **Rates & Fees** page with descriptive subtitle
+- Daily Green Fees table (adult and youth rates)
+- Cart & Equipment Fees (4 cards: 9-hole carts, 18-hole carts, other cart fees, club rentals)
+- Driving Range rates table
+- Membership CTA button linking to `/memberships`
+
 ### Events (`/events`)
 
-- Public events calendar with type filtering (tournament, league, clinic, social)
+- Public events calendar with type filtering (tournament, general, social)
 - Online registration with party size and real-time spot tracking
 - **Private events** — hidden from public calendar; blocks tee time booking during event hours
+- 16 events from the 2026 season loaded from swanlakecc.com (11 tournaments, 5 social/general)
 
 ### Transactional Email
 
@@ -286,11 +322,15 @@ PostgreSQL lives on the same VM. Schedule a daily `pg_dump` and ship it offsite:
 ```
 src/
   app/
-    page.tsx                    # Homepage
+    page.tsx                    # Homepage (6 cards: Tee Times, Rates, Memberships, Course, Events, Tournaments)
+    about/page.tsx              # Club leadership, board, contact info
+    course/page.tsx             # Golf Course Overview + scorecard
+    rates/page.tsx              # Rates & Fees
     tee-times/page.tsx          # Public booking grid
-    memberships/page.tsx        # Membership tiers + checkout
+    memberships/page.tsx        # Membership tiers + modal checkout + driving range add-ons
     tournaments/                # Public tournament list + detail
     events/page.tsx             # Public events calendar
+    settings/page.tsx           # User account settings (profile, password, membership)
     login/page.tsx              # Sign in (credentials + OAuth)
     register/page.tsx           # Account creation
     admin/
@@ -327,8 +367,10 @@ src/
         quickbooks/             # QuickBooks invoice
       desk/                     # Desk/kiosk APIs
   components/
-    Header.tsx
+    Header.tsx                  # Site header with initials avatar dropdown
+    AdminBar.tsx                # Global admin nav bar (visible to admins on all pages)
     Footer.tsx
+    PwaProvider.tsx             # PWA install prompt with swan logo
     SquareWalletButtons.tsx     # Google Pay / Apple Pay (fetches config at runtime)
   lib/
     db/
@@ -341,7 +383,7 @@ src/
     types.ts                    # Shared types, MEMBERSHIP_TYPES, TEE_TIME_SLOTS
   auth.ts                       # NextAuth config (Node.js — DB-backed providers)
   auth.config.ts                # Edge-safe auth config (middleware only)
-  middleware.ts                 # Redirects unauthenticated users from /admin
+  middleware.ts                 # Redirects unauthenticated users from /admin and /settings
 ```
 
 ---
@@ -364,6 +406,7 @@ src/
 | GET | `/api/events` | Upcoming public events |
 | POST | `/api/events/[id]/register` | Register for an event |
 | GET | `/api/config/public` | Square app ID / location ID for browser |
+| GET/PATCH | `/api/user/settings` | User profile + linked membership (auth required) |
 
 ### Admin Endpoints (require admin session)
 

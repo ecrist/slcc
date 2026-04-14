@@ -40,8 +40,9 @@ This file is the authoritative record of what is implemented. Update it whenever
 - Providers: Credentials (email/password, bcrypt), Google OAuth, Apple Sign In
 - Google/Apple credentials read from DB at runtime (NOT env vars) — require server restart to take effect
 - Edge-safe split: `auth.config.ts` (no DB, used by middleware) + `auth.ts` (full Node.js config)
-- Middleware protects `/admin/*` — checks JWT only
+- Middleware protects `/admin/*` and `/settings/*` — checks JWT only
 - Admin layout does DB lookup (`isAdminEmail()`) for actual role verification
+- JWT callback refreshes name/email from DB on every token refresh so profile changes reflect immediately
 - Session shape: `{ user: { id, name, email, image, isAdmin } }`
 - Default admin on fresh DB: `admin@swanlakecc.com` / `admin`
 
@@ -58,11 +59,11 @@ This file is the authoritative record of what is implemented. Update it whenever
 
 | Table | Purpose |
 |-------|---------|
-| `users` | Registered accounts (id, email, name, password_hash) |
+| `users` | Registered accounts (id, email, name, password_hash, phone) |
 | `admin_users` | Emails with admin access (id, email, added_by, created_at) |
 | `site_config` | Key/value store for all operational settings |
 | `tee_times` | Booked tee time slots |
-| `memberships` | Member records with payment and NFC info |
+| `memberships` | Member records with payment and NFC info; `user_id` FK links to `users` |
 | `events` | Club events (public + private) |
 | `event_registrations` | Event sign-ups |
 | `tournaments` | Tournament definitions |
@@ -150,6 +151,10 @@ Six tiers:
 - Driving Range – Single: $80
 - Driving Range – Household: $125
 
+**Driving range add-on bundling:** Young Adult, Single, and Household tiers can add a driving range pass at checkout (Single: +$80, Household: +$125). Standalone range passes remain purchasable.
+
+**Modal checkout:** Clicking a membership card opens a purchase modal (pre-filled from session) instead of inline expansion.
+
 Season: May 1 – Oct 31 (current year).
 
 Payment flow:
@@ -160,6 +165,27 @@ Payment flow:
 Auto-renewal: opt-in checkbox at checkout → Square Card on File stored (`square_customer_id`, `square_card_id` on membership row).
 
 Member number format: `SLCC-YYYY-XXXXXX`
+
+### Membership ↔ Account Linking
+
+- `memberships.user_id` FK → `users.id` (added via migration with email-based backfill)
+- Logged-in user purchases → `user_id` set automatically
+- New user registration → auto-links any existing membership by email match
+- Admin creates membership for unknown email → auto-creates user account with temp password, sends invite email via `sendAccountInvite()`
+
+### Member Information Section
+
+Below the membership cards on `/memberships`:
+- **Member Days & Times** — weekly schedule table (Ladies Day, Men's League, Couples, etc.)
+- **Ladies League Information** — details with PDF link
+
+## Account Settings (`/settings`)
+
+Authenticated users manage their profile:
+- **Profile:** name, email, phone — changes reflected in header immediately via JWT refresh + `updateSession()`
+- **Password:** current + new + confirm, bcrypt verified
+- **Membership info:** linked membership details (member #, type, status, season, payment) or CTA to purchase
+- User avatar with initials + "Member since" date
 
 ---
 
@@ -194,11 +220,12 @@ Cron endpoint: `POST /api/admin/billing/renew?secret=CRON_SECRET`
 
 ## Events (`/events`, `/admin/events`)
 
-- Types: general, tournament, league, clinic, social
+- Types: general, tournament, social
 - `is_public = 1` → visible on public calendar, available for registration
 - `is_public = 0` → **Private**: hidden from public calendar AND blocks online tee time booking during event's time window on that date (whole day if no start/end times set)
 - Admin can toggle Public ↔ Private per event with one click
 - Admin events page (`/api/admin/events`) shows ALL events; public `/api/events` shows only public ones
+- **2026 season data:** 16 events loaded from swanlakecc.com — 11 tournaments (Spring Classic, Club Championship, Vangen, etc.) and 5 social/general (Kick-Off Dinner, Membership Meeting, Fundraiser, Aeration closure, Appreciation Day)
 
 ---
 
@@ -232,6 +259,52 @@ NFC cards: UUID token stored on membership (`nfc_token`). iOS uses tap-to-open U
 
 ---
 
+## Public Pages
+
+### Homepage (`/`)
+- 6 navigation cards in a 2×3 grid: Tee Times, Rates, Memberships (top); Course, Events, Tournaments (bottom)
+- Each card has an SVG icon, title, and description
+
+### About (`/about`)
+- **Personnel:** Club Manager and Course Superintendent cards with photos, phone numbers, and year ranges
+- **Board of Directors:** Table with name, position, year elected, and phone number (title inside card)
+- **Contact Info:** Directions (Google Maps), email, and phone buttons
+
+### Course (`/course`)
+- **Golf Course Overview** title
+- **Tee Options:** Championship, Men's, Ladies with yardage and slope/rating
+- **Scorecard:** Hole-by-hole par and yardage; Holes 1 and 8 show par as "4/5" with footnote explaining separate men's/ladies par
+- **Amenities:** Course features and facilities
+
+### Rates (`/rates`)
+- **Rates & Fees** title with descriptive subtitle
+- **Daily Green Fees** table card (adult and youth rates) with membership CTA button below
+- **Cart & Equipment Fees** section: 4 cards (9-hole carts, 18-hole carts, other cart fees, club rentals)
+- **Driving Range** table card (buckets, passes)
+
+### Tee Times (`/tee-times`)
+- "Clubhouse Hours:" label (changed from "Clubhouse:")
+
+---
+
+## UI Components
+
+### Header (`Header.tsx`)
+- Top bar: bg-swan-green-light with directions, email, phone links (desktop); phone number only on mobile
+- Logo: square with rounded corners (`rounded-xl`)
+- User section: initials avatar in circle → dropdown menu with Settings link and Sign Out
+- No "Admin" link in nav (admin bar handles admin navigation)
+
+### AdminBar (`AdminBar.tsx`)
+- Global admin navigation bar visible on all pages for admin users
+- Client component using `useSession()` and `usePathname()` for active link highlighting
+- Contains all admin nav links: Dashboard, Tee Sheet, Bookings, Memberships, Billing, Tournaments, Events, Equipment, Settings, Desk Mode
+
+### PWA Install Prompt (`PwaProvider.tsx`)
+- Install popup displays swan logo in white rounded box
+
+---
+
 ## Transactional Email (Nodemailer)
 
 All sends are fire-and-forget (`.catch(() => {})`). Silently skips if `smtp_host` not configured.
@@ -241,6 +314,7 @@ Emails sent for:
 - Membership purchase receipt (member number, tier, amount, season dates)
 - Tournament registration confirmation
 - Membership renewal reminder (link to renew)
+- Account invite (when admin creates membership for non-existing user)
 
 ---
 
@@ -272,7 +346,8 @@ Emails sent for:
 | POST | `/api/tournaments/[id]/enter` | Register for tournament |
 | DELETE | `/api/tournaments/[id]/enter` | Withdraw |
 | GET | `/api/config/public` | Square app ID + location ID for browser |
-| POST | `/api/auth/register` | Create user account |
+| GET/PATCH | `/api/user/settings` | User profile + linked membership info (auth required) |
+| POST | `/api/auth/register` | Create user account (auto-links memberships by email) |
 
 ### Admin (require admin session)
 | Method | Path | Description |
