@@ -18,7 +18,7 @@ export default function AdminBar() {
     { href: "/admin/tournaments", label: "Tournaments" },
     { href: "/admin/events", label: "Events" },
     { href: "/admin/equipment", label: "Equipment" },
-    { href: "/admin/contacts", label: "Contacts" },
+    { href: "/admin/players", label: "Players" },
     { href: "/admin/reports", label: "Reports" },
     { href: "/admin/settings", label: "Settings" },
   ];

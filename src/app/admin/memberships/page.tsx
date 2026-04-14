@@ -15,6 +15,22 @@ interface InlineEdit {
   value: string;
 }
 
+const YEAR = new Date().getFullYear();
+const EMPTY_NEW = {
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  state: "MN",
+  zip: "",
+  membership_type: "single" as MembershipType,
+  start_date: `${YEAR}-05-01`,
+  end_date: `${YEAR}-10-31`,
+  payment_status: "paid",
+};
+
 export default function AdminMemberships() {
   const [memberships, setMemberships] = useState<MembershipWithNfc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +39,10 @@ export default function AdminMemberships() {
   const [nfcWriting, setNfcWriting] = useState(false);
   const [nfcMsg, setNfcMsg] = useState("");
   const [editing, setEditing] = useState<InlineEdit | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const [newForm, setNewForm] = useState({ ...EMPTY_NEW });
+  const [creating, setCreating] = useState(false);
+  const [flashMsg, setFlashMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => { fetchMemberships(); }, []);
 
@@ -93,11 +113,48 @@ export default function AdminMemberships() {
     setEditing({ id: m.id, field, value: current });
   }
 
+  function flash(type: "success" | "error", text: string) {
+    setFlashMsg({ type, text });
+    setTimeout(() => setFlashMsg(null), 4000);
+  }
+
+  async function createMembership() {
+    if (!newForm.first_name || !newForm.last_name || !newForm.email) return;
+    setCreating(true);
+    const res = await fetch("/api/memberships", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...newForm, payment_provider: "manual", admin_created: true }),
+    });
+    setCreating(false);
+    if (res.ok) {
+      const data = await res.json();
+      setShowNew(false);
+      setNewForm({ ...EMPTY_NEW });
+      flash("success", `Membership ${data.member_number} created.${data.account_created ? " Account invite sent." : ""}`);
+      fetchMemberships();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      flash("error", err.error ?? "Failed to create membership.");
+    }
+  }
+
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="section-title">Manage Memberships</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="section-title mb-0">Manage Memberships</h1>
+        <button onClick={() => { setShowNew(true); setNewForm({ ...EMPTY_NEW }); }} className="btn-primary text-sm py-2 px-4">
+          + New Membership
+        </button>
+      </div>
+
+      {flashMsg && (
+        <div className={`mb-4 p-3 rounded-lg text-sm ${flashMsg.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+          {flashMsg.text}
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -323,6 +380,118 @@ export default function AdminMemberships() {
                 className="w-full py-2 text-sm text-red-600 hover:text-red-800 font-medium"
               >
                 Regenerate Token (invalidates existing cards)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Membership Modal ──────────────────────────────────────────── */}
+      {showNew && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowNew(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-swan-green">New Membership</h2>
+              <button onClick={() => setShowNew(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              If the email matches an existing account, it will be linked automatically. Otherwise a new account is created and an invite email is sent.
+            </p>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
+                  <input className="input-field w-full" value={newForm.first_name}
+                    onChange={(e) => setNewForm({ ...newForm, first_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
+                  <input className="input-field w-full" value={newForm.last_name}
+                    onChange={(e) => setNewForm({ ...newForm, last_name: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
+                <input type="email" className="input-field w-full" value={newForm.email}
+                  onChange={(e) => setNewForm({ ...newForm, email: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                <input className="input-field w-full" placeholder="(218) 555-0100" value={newForm.phone}
+                  onChange={(e) => setNewForm({ ...newForm, phone: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+                <input className="input-field w-full" placeholder="123 Main St" value={newForm.address}
+                  onChange={(e) => setNewForm({ ...newForm, address: e.target.value })} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                  <input className="input-field w-full" value={newForm.city}
+                    onChange={(e) => setNewForm({ ...newForm, city: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                  <input className="input-field w-full" value={newForm.state}
+                    onChange={(e) => setNewForm({ ...newForm, state: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Zip</label>
+                  <input className="input-field w-full" value={newForm.zip}
+                    onChange={(e) => setNewForm({ ...newForm, zip: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Membership Type</label>
+                <select className="input-field w-full" value={newForm.membership_type}
+                  onChange={(e) => setNewForm({ ...newForm, membership_type: e.target.value as MembershipType })}>
+                  {Object.entries(MEMBERSHIP_TYPES).map(([key, val]) => (
+                    <option key={key} value={key}>{val.name} — ${val.price}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                  <input type="date" className="input-field w-full" value={newForm.start_date}
+                    onChange={(e) => setNewForm({ ...newForm, start_date: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                  <input type="date" className="input-field w-full" value={newForm.end_date}
+                    onChange={(e) => setNewForm({ ...newForm, end_date: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Status</label>
+                <select className="input-field w-full" value={newForm.payment_status}
+                  onChange={(e) => setNewForm({ ...newForm, payment_status: e.target.value })}>
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setShowNew(false)} className="py-2 px-4 rounded-lg border border-gray-300 text-gray-600 text-sm">
+                Cancel
+              </button>
+              <button
+                onClick={createMembership}
+                disabled={creating || !newForm.first_name || !newForm.last_name || !newForm.email}
+                className="btn-primary flex-1"
+              >
+                {creating ? "Creating…" : "Create Membership"}
               </button>
             </div>
           </div>
