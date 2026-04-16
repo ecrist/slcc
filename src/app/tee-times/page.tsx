@@ -71,11 +71,11 @@ function localDateStr(d: Date = new Date()): string {
 
 export default function TeeTimesPage() {
   const { data: session } = useSession();
-  const [selectedDate, setSelectedDate] = useState(() => localDateStr());
+  const [selectedDate, setSelectedDate] = useState("");
   const [players, setPlayers] = useState(2);
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
   const [equipment, setEquipment] = useState<Equipment | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [bookingSlot, setBookingSlot] = useState<string | null>(null);
   const [bookingHoles, setBookingHoles] = useState("18");
   const [bookingEmail, setBookingEmail] = useState("");
@@ -134,7 +134,13 @@ export default function TeeTimesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotsNeeded, players]);
 
+  // Set initial date on mount (client-only to avoid hydration mismatch)
   useEffect(() => {
+    setSelectedDate(localDateStr());
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDate) return; // skip until client-side date is set
     fetchData();
     setBookingSlot(null);
   }, [selectedDate]);
@@ -248,8 +254,8 @@ export default function TeeTimesPage() {
     return null;
   }
 
-  const today = localDateStr();
-  const isToday = selectedDate === today;
+  const today = selectedDate ? localDateStr() : "";
+  const isToday = selectedDate !== "" && selectedDate === today;
   const isBeyondClose = autoCloseDate ? selectedDate >= autoCloseDate : false;
 
   // Filter slots to the configured tee time window, and exclude past slots for today
@@ -265,11 +271,11 @@ export default function TeeTimesPage() {
     return true;
   });
 
-  const dateOptions = Array.from({ length: bookingDaysAhead }, (_, i) => {
+  const dateOptions = selectedDate ? Array.from({ length: bookingDaysAhead }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     return localDateStr(d);
-  });
+  }) : [];
 
   function formatTime(time: string) {
     const [h, m] = time.split(":");
@@ -302,15 +308,27 @@ export default function TeeTimesPage() {
       lines.push({ label: `Green fee (${is9 ? "9" : "18"} holes) × ${members.length} member${members.length > 1 ? "s" : ""}`, amount: 0 });
     }
 
-    // Cart pricing — pair riders 2-per-cart, each pays half the full cart rate
-    // Solo rider also pays the half rate (not the full cart rate)
+    // Cart pricing — pair riders 2-per-cart
+    // Solo rider: pays "half cart" rate (the solo/single rider price)
+    // Shared cart: each rider pays half of the "full cart" rate for their member status
     const riders = playerEntries.filter((p) => p.ridingCart);
     const cartPairs: PlayerEntry[][] = [];
     for (let i = 0; i < riders.length; i += 2) {
       cartPairs.push(i + 1 < riders.length ? [riders[i], riders[i + 1]] : [riders[i]]);
     }
     for (const pair of cartPairs) {
-      for (const p of pair) {
+      if (pair.length === 2) {
+        // Sharing a cart — each pays half the full cart rate for their member status
+        for (const p of pair) {
+          const fullRate = p.isMember
+            ? (is9 ? rates.cartMemberFull9 : rates.cartMemberFull18)
+            : (is9 ? rates.cartNonmemberFull9 : rates.cartNonmemberFull18);
+          const splitRate = fullRate / 2;
+          lines.push({ label: `Shared cart – ${p.isMember ? "member" : "non-member"} (${p.name || "player"})`, amount: splitRate });
+        }
+      } else {
+        // Solo rider — pays the half cart (single rider) rate
+        const p = pair[0];
         const rate = p.isMember
           ? (is9 ? rates.cartMemberHalf9 : rates.cartMemberHalf18)
           : (is9 ? rates.cartNonmemberHalf9 : rates.cartNonmemberHalf18);
