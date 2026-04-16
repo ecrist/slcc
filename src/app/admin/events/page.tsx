@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { GolfEvent } from "@/lib/types";
+import { SkeletonTable } from "@/components/Skeleton";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function AdminEvents() {
   const [events, setEvents] = useState<GolfEvent[]>([]);
@@ -19,6 +21,13 @@ export default function AdminEvents() {
     is_public: true,
   });
   const [submitResult, setSubmitResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GolfEvent | null>(null);
+  const [editTarget, setEditTarget] = useState<GolfEvent | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "", description: "", event_date: "", start_time: "", end_time: "",
+    event_type: "general", max_participants: "", cost: "", is_public: true,
+  });
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => { fetchEvents(); }, []);
 
@@ -79,9 +88,60 @@ export default function AdminEvents() {
     fetchEvents();
   }
 
+  function openEdit(evt: GolfEvent) {
+    setEditTarget(evt);
+    setEditForm({
+      title: evt.title,
+      description: evt.description || "",
+      event_date: evt.event_date,
+      start_time: evt.start_time || "",
+      end_time: evt.end_time || "",
+      event_type: evt.event_type,
+      max_participants: evt.max_participants ? String(evt.max_participants) : "",
+      cost: evt.cost ? String(evt.cost) : "",
+      is_public: !!evt.is_public,
+    });
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch("/api/admin/events", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editTarget.id,
+          title: editForm.title,
+          description: editForm.description || null,
+          event_date: editForm.event_date,
+          start_time: editForm.start_time || null,
+          end_time: editForm.end_time || null,
+          event_type: editForm.event_type,
+          max_participants: editForm.max_participants ? parseInt(editForm.max_participants) : null,
+          cost: editForm.cost ? parseFloat(editForm.cost) : null,
+          is_public: editForm.is_public ? 1 : 0,
+        }),
+      });
+      if (res.ok) {
+        setSubmitResult({ type: "success", message: "Event updated!" });
+        setEditTarget(null);
+        fetchEvents();
+      } else {
+        const err = await res.json();
+        setSubmitResult({ type: "error", message: err.error || "Failed to update event" });
+      }
+    } catch {
+      setSubmitResult({ type: "error", message: "Network error" });
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   async function handleDelete(id: number) {
-    if (!confirm("Delete this event?")) return;
     await fetch(`/api/admin/events?id=${id}`, { method: "DELETE" });
+    setDeleteTarget(null);
     fetchEvents();
   }
 
@@ -180,7 +240,7 @@ export default function AdminEvents() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <SkeletonTable rows={6} cols={5} />
       ) : events.length === 0 ? (
         <div className="text-center py-12 text-gray-500">No events.</div>
       ) : (
@@ -255,8 +315,11 @@ export default function AdminEvents() {
                   <td className="px-4 py-3 text-center text-sm">
                     {evt.cost ? `$${evt.cost}` : "Free"}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleDelete(evt.id)} className="text-red-500 hover:text-red-700 text-xs font-medium">
+                  <td className="px-4 py-3 text-right space-x-3">
+                    <button onClick={() => openEdit(evt)} className="text-swan-green hover:text-swan-green-light text-xs font-medium">
+                      Edit
+                    </button>
+                    <button onClick={() => setDeleteTarget(evt)} className="text-red-500 hover:text-red-700 text-xs font-medium">
                       Delete
                     </button>
                   </td>
@@ -266,6 +329,102 @@ export default function AdminEvents() {
           </table>
         </div>
       )}
+
+      {/* Edit Event Modal */}
+      {editTarget && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40 animate-overlay-in" onClick={() => setEditTarget(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-swan-green">Edit Event</h2>
+                <button onClick={() => setEditTarget(null)} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <form onSubmit={handleUpdate} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                  <input type="text" required className="input-field" value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea className="input-field" rows={3} value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                    <input type="date" required className="input-field" value={editForm.event_date}
+                      onChange={(e) => setEditForm({ ...editForm, event_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input type="time" className="input-field" value={editForm.start_time}
+                      onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input type="time" className="input-field" value={editForm.end_time}
+                      onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select className="input-field" value={editForm.event_type}
+                      onChange={(e) => setEditForm({ ...editForm, event_type: e.target.value })}>
+                      <option value="general">General</option>
+                      <option value="tournament">Tournament</option>
+                      <option value="league">League</option>
+                      <option value="clinic">Clinic</option>
+                      <option value="social">Social</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Participants</label>
+                    <input type="number" className="input-field" value={editForm.max_participants}
+                      onChange={(e) => setEditForm({ ...editForm, max_participants: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost ($)</label>
+                    <input type="number" step="0.01" className="input-field" value={editForm.cost}
+                      onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} />
+                  </div>
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={!editForm.is_public}
+                    onChange={(e) => setEditForm({ ...editForm, is_public: !e.target.checked })}
+                    className="w-4 h-4 text-purple-600 rounded" />
+                  <span className="text-sm font-medium text-gray-700">Private event</span>
+                </label>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setEditTarget(null)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={editSaving} className="btn-primary py-2 px-6 text-sm">
+                    {editSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Event"
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This will also remove all registrations. This cannot be undone.`}
+        confirmLabel="Delete Event"
+        variant="danger"
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

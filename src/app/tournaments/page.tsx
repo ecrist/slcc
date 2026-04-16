@@ -19,8 +19,8 @@ export default async function TournamentsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="section-title">Tournaments</h1>
-      <p className="text-gray-600 mb-10 max-w-2xl">
+      <h1 className="section-title animate-fade-in-up">Tournaments</h1>
+      <p className="text-gray-600 mb-10 max-w-2xl animate-fade-in-up">
         Swan Lake Country Club hosts weekly Luck of the Draw scrambles and a full schedule of
         seasonal tournaments. Register online or call the clubhouse at (218) 885-3543.
       </p>
@@ -67,7 +67,7 @@ function TournamentCard({ t }: { t: Tournament & { entry_count: number } }) {
   const isFull = t.max_entries != null && t.entry_count >= t.max_entries;
 
   return (
-    <Link href={`/tournaments/${t.id}`} className="card block hover:shadow-lg transition-shadow">
+    <Link href={`/tournaments/${t.id}`} className="card block hover:shadow-lg transition-shadow animate-fade-in-up">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">

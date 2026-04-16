@@ -6,6 +6,8 @@ import AdminBar from "@/components/AdminBar";
 import Footer from "@/components/Footer";
 import SessionProvider from "@/components/SessionProvider";
 import PwaProvider from "@/components/PwaProvider";
+import { ToastProvider } from "@/components/Toast";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 const robotoCondensed = Roboto_Condensed({
   subsets: ["latin"],
@@ -46,11 +48,14 @@ export default function RootLayout({
       </head>
       <body className={`${robotoCondensed.variable} ${merriweather.variable} font-body flex flex-col min-h-screen`}>
         <SessionProvider>
-          <Header />
-          <AdminBar />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <PwaProvider />
+          <ToastProvider>
+            <AnnouncementBanner />
+            <Header />
+            <AdminBar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <PwaProvider />
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

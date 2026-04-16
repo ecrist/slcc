@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { SkeletonSlotGrid } from "@/components/Skeleton";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 
 interface BookedSlot {
@@ -213,7 +214,7 @@ export default function TeeSheetPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-gray-400">Loading...</div>
+        <SkeletonSlotGrid />
       ) : (
         <div className="grid gap-1">
           {TEE_TIME_SLOTS.map((time) => {

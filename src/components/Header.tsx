@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 
 function UserInitials({ name, email }: { name?: string | null; email?: string | null }) {
@@ -23,9 +23,28 @@ function UserInitials({ name, email }: { name?: string | null; email?: string | 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [contactPhone, setContactPhone] = useState("(218) 885-3543");
+  const [contactEmail, setContactEmail] = useState("golf@swanlakecc.com");
   const { data: session } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Load contact info from DB config
+  useEffect(() => {
+    fetch("/api/config/public")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.contact_phone) setContactPhone(data.contact_phone);
+        if (data.contact_email) setContactEmail(data.contact_email);
+      })
+      .catch(() => {});
+  }, []);
+
+  function navLinkClass(href: string) {
+    const active = pathname === href || (href !== "/" && pathname.startsWith(href));
+    return `transition-colors font-medium ${active ? "text-swan-gold" : "text-white hover:text-swan-gold"}`;
+  }
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -53,11 +72,11 @@ export default function Header() {
             </svg>
             Back to swanlakecc.com
           </a>
-          <a href="tel:+12188853543" className="sm:hidden text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
+          <a href={`tel:${contactPhone.replace(/[^\d+]/g, "")}`} className="sm:hidden text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
             </svg>
-            (218) 885-3543
+            {contactPhone}
           </a>
           <div className="hidden sm:flex items-center gap-4">
             <a href="https://goo.gl/maps/eavaLfnd1zQdaPLD6" target="_blank" rel="noopener noreferrer" className="text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
@@ -67,17 +86,17 @@ export default function Header() {
               </svg>
               Directions
             </a>
-            <a href="mailto:golf@swanlakecc.com" className="text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
+            <a href={`mailto:${contactEmail}`} className="text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
               </svg>
-              golf@swanlakecc.com
+              {contactEmail}
             </a>
-            <a href="tel:+12188853543" className="text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
+            <a href={`tel:${contactPhone.replace(/[^\d+]/g, "")}`} className="text-white/90 hover:text-white text-sm flex items-center gap-1.5 transition-colors">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
               </svg>
-              (218) 885-3543
+              {contactPhone}
             </a>
           </div>
         </div>
@@ -99,27 +118,13 @@ export default function Header() {
           </Link>
 
           <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/course" className="text-white hover:text-swan-gold transition-colors font-medium">
-              Course
-            </Link>
-            <Link href="/tee-times" className="text-white hover:text-swan-gold transition-colors font-medium">
-              Tee Times
-            </Link>
-            <Link href="/rates" className="text-white hover:text-swan-gold transition-colors font-medium">
-              Rates
-            </Link>
-            <Link href="/memberships" className="text-white hover:text-swan-gold transition-colors font-medium">
-              Memberships
-            </Link>
-            <Link href="/events" className="text-white hover:text-swan-gold transition-colors font-medium">
-              Events
-            </Link>
-            <Link href="/tournaments" className="text-white hover:text-swan-gold transition-colors font-medium">
-              Tournaments
-            </Link>
-            <Link href="/about" className="text-white hover:text-swan-gold transition-colors font-medium">
-              About
-            </Link>
+            <Link href="/course" className={navLinkClass("/course")}>Course</Link>
+            <Link href="/tee-times" className={navLinkClass("/tee-times")}>Tee Times</Link>
+            <Link href="/rates" className={navLinkClass("/rates")}>Rates</Link>
+            <Link href="/memberships" className={navLinkClass("/memberships")}>Memberships</Link>
+            <Link href="/events" className={navLinkClass("/events")}>Events</Link>
+            <Link href="/tournaments" className={navLinkClass("/tournaments")}>Tournaments</Link>
+            <Link href="/about" className={navLinkClass("/about")}>About</Link>
             {session ? (
               <div className="relative" ref={userMenuRef}>
                 <button onClick={() => setUserMenuOpen(!userMenuOpen)} aria-label="User menu">
@@ -185,29 +190,26 @@ export default function Header() {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden bg-swan-green-light border-t border-swan-green">
+        <div className="md:hidden bg-swan-green-light border-t border-swan-green animate-menu-slide-down">
           <div className="px-4 py-3 space-y-3">
-            <Link href="/course" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              Course
-            </Link>
-            <Link href="/tee-times" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              Tee Times
-            </Link>
-            <Link href="/rates" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              Rates
-            </Link>
-            <Link href="/memberships" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              Memberships
-            </Link>
-            <Link href="/events" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              Events
-            </Link>
-            <Link href="/tournaments" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              Tournaments
-            </Link>
-            <Link href="/about" className="block text-white hover:text-swan-gold font-medium" onClick={() => setMobileOpen(false)}>
-              About
-            </Link>
+            {[
+              { href: "/course", label: "Course" },
+              { href: "/tee-times", label: "Tee Times" },
+              { href: "/rates", label: "Rates" },
+              { href: "/memberships", label: "Memberships" },
+              { href: "/events", label: "Events" },
+              { href: "/tournaments", label: "Tournaments" },
+              { href: "/about", label: "About" },
+            ].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`block font-medium ${pathname === link.href || pathname.startsWith(link.href) ? "text-swan-gold" : "text-white hover:text-swan-gold"}`}
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
             {session ? (
               <>
                 <div className="border-t border-white/10 pt-3 mt-1">

@@ -257,6 +257,18 @@ async function migrate() {
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT NOT NULL DEFAULT ''",
     ];
+
+    // ── Password reset tokens table ─────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token      TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used       BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
     for (const sql of alterations) {
       await client.query(sql);
     }
@@ -299,7 +311,7 @@ async function migrate() {
     // ── Default site configuration ─────────────────────────────────────────────
     const defaults: [string, string, string, string][] = [
       ["course_open",            "true",            "Course Open for Booking",       "Allow new tee time bookings to be made online"],
-      ["booking_days_ahead",     "7",               "Booking Window (days)",          "How many days in advance tee times can be booked"],
+      ["booking_days_ahead",     "8",               "Booking Window (days)",          "How many days ahead tee times are shown (e.g. 8 = today through 8 days out)"],
       ["green_fee_9_holes",      "25",              "9-Hole Green Fee ($)",           ""],
       ["green_fee_18_holes",     "35",              "18-Hole Green Fee ($)",          ""],
       ["cart_fee_per_9",         "10",              "Cart Rental Fee ($ / 9 holes)",  ""],
@@ -312,10 +324,10 @@ async function migrate() {
       ["season_start",           "05-01",           "Season Start (MM-DD)",            "First day bookings are accepted, e.g. 05-01 for May 1"],
       ["season_end",             "10-31",           "Season End (MM-DD)",              "Last day bookings are accepted, e.g. 10-31 for Oct 31"],
       ["tee_time_open",          "07:00",           "First Tee Time",                  "Earliest available booking slot, e.g. 07:00"],
-      ["tee_time_close",         "17:48",           "Last Tee Time",                   "Latest available booking slot, e.g. 17:48 — overridden by sunset cutoff when enabled"],
+      ["tee_time_close",         "",                "Last Tee Time",                   "Latest booking slot (e.g. 17:48). Leave blank to use sunset-based cutoff automatically."],
       ["clubhouse_open",         "06:00",           "Clubhouse Opens",                 "When the clubhouse opens (display only)"],
       ["clubhouse_close",        "20:00",           "Clubhouse Closes",                "When the clubhouse closes (display only)"],
-      ["sunset_cutoff_enabled",  "true",            "Auto-close at Sunset",            "Automatically set the last tee time to 2 hours before sunset"],
+      ["sunset_cutoff_enabled",  "true",            "Sunset Cutoff (legacy)",          "No longer used — sunset cutoff is automatic when Last Tee Time is blank"],
       ["sunset_cutoff_hours",    "2",               "Sunset Cutoff (hours before)",    "How many hours before sunset to stop accepting bookings"],
       ["course_latitude",        "47.72",           "Course Latitude",                 "Used for sunset calculation — Pengilly, MN default"],
       ["course_longitude",       "-93.01",          "Course Longitude",                "Used for sunset calculation — Pengilly, MN default"],
@@ -340,6 +352,37 @@ async function migrate() {
       ["cron_secret",            "",                "Cron Secret",                    "Shared secret for POST /api/admin/billing/renew?secret=… — use a long random string"],
       ["toast_webhook_secret",   "",                "Toast Webhook Secret",            "HMAC-SHA256 secret from Toast Partner Portal — used to verify incoming webhook signatures"],
       ["toast_location_guid",    "",                "Toast Restaurant GUID",           "Your restaurant's GUID from the Toast Portal — used to validate that webhooks are for this location"],
+      ["announcement_enabled",   "false",           "Show Announcement Banner",        "Display a site-wide announcement banner above the header"],
+      ["announcement_message",   "",                "Announcement Message",            "Text to display in the announcement banner (e.g. course closed for weather, special event)"],
+      // Rates — green fees
+      ["green_fee_youth_16_18",  "15",              "Youth Green Fee 16-18 ($)",       ""],
+      ["green_fee_youth_13_15",  "10",              "Youth Green Fee 13-15 ($)",       ""],
+      // Rates — cart fees (member)
+      ["cart_member_half_9",     "10",              "Member Half Cart 9 Holes ($)",    ""],
+      ["cart_member_full_9",     "17.50",           "Member Full Cart 9 Holes ($)",    ""],
+      ["cart_member_half_18",    "15",              "Member Half Cart 18 Holes ($)",   ""],
+      ["cart_member_full_18",    "25",              "Member Full Cart 18 Holes ($)",   ""],
+      // Rates — cart fees (non-member)
+      ["cart_nonmember_half_9",  "17.50",           "Non-Member Half Cart 9 Holes ($)",""],
+      ["cart_nonmember_full_9",  "30",              "Non-Member Full Cart 9 Holes ($)",""],
+      ["cart_nonmember_half_18", "25",              "Non-Member Half Cart 18 Holes ($)",""],
+      ["cart_nonmember_full_18", "40",              "Non-Member Full Cart 18 Holes ($)",""],
+      // Rates — other fees
+      ["pull_cart_fee",          "3",               "Pull Cart Rental ($)",            ""],
+      ["club_rental_9",         "15",              "Club Rental 9 Holes ($)",         ""],
+      ["club_rental_18",        "20",              "Club Rental 18 Holes ($)",        ""],
+      ["cart_storage_trail",     "120",             "Trail Fee Seasonal ($)",          ""],
+      ["cart_storage_gas",       "200",             "Gas Cart Storage Annual ($)",     ""],
+      ["cart_storage_electric",  "230",             "Electric Cart Storage Annual ($)",""],
+      // Rates — driving range
+      ["range_small_bag",        "5",               "Range Small Bag ($)",             ""],
+      ["range_large_bag",        "7",               "Range Large Bag ($)",             ""],
+      // Season auto-toggle dates
+      ["course_auto_open_date",  "",                "Auto-Open Date",                  "Automatically open the course on this date (YYYY-MM-DD). Leave blank for manual control."],
+      ["course_auto_close_date", "",                "Auto-Close Date",                 "Automatically close the course on this date (YYYY-MM-DD). Leave blank for manual control."],
+      // Footer / display hours
+      ["proshop_open",           "7:00 AM",         "Pro Shop Opens",                  "Display only — shown in the site footer"],
+      ["proshop_close",          "6:00 PM",         "Pro Shop Closes",                 "Display only — shown in the site footer"],
     ];
 
     for (const [key, value, label, description] of defaults) {

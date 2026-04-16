@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { SkeletonTable } from "@/components/Skeleton";
 import type { TeeTime } from "@/lib/types";
 
 export default function AdminTeeTimes() {
@@ -64,7 +65,7 @@ export default function AdminTeeTimes() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <SkeletonTable rows={6} cols={4} />
       ) : groupList.length === 0 ? (
         <div className="text-center py-12 text-gray-500">No tee times booked for this date.</div>
       ) : (

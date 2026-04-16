@@ -196,6 +196,32 @@ export async function sendRenewalReminder(opts: {
   );
 }
 
+// ── Password reset ────────────────────────────────────────────────────────────
+
+export async function sendPasswordReset(opts: {
+  to: string;
+  first_name: string;
+  resetUrl: string;
+}) {
+  await send(
+    opts.to,
+    `Reset Your Password — Swan Lake CC`,
+    layout(`
+      <h2 style="color:#1a4a2e;margin:0 0 4px;">Password Reset</h2>
+      <p style="margin:0 0 16px;color:#4b5563;">
+        Hi ${opts.first_name}, we received a request to reset your password. Click the button below to set a new one.
+        This link expires in 1 hour.
+      </p>
+      <a href="${opts.resetUrl}" style="background:#1a4a2e;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block;">
+        Reset Password
+      </a>
+      <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
+        If you didn't request this, you can safely ignore this email. Your password won't change.
+      </p>
+    `)
+  );
+}
+
 // ── Tournament registration ────────────────────────────────────────────────────
 
 export async function sendTournamentRegistration(opts: {

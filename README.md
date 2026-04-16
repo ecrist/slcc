@@ -26,10 +26,18 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 ### Tee Time Booking (`/tee-times`)
 
 - Browse available times for any date within the configured booking window
-- 12-minute slots from first to last tee time (configurable)
+- 12-minute slots from first to last tee time (configurable); blank `tee_time_close` = automatic sunset-based cutoff
 - Party sizes 1–12; large parties automatically reserve 2–3 consecutive slots
 - Concurrency-safe: `BEGIN IMMEDIATE` transaction + unique partial index prevent double-booking
-- Optional equipment rental per booking: power carts, walking buggies, club sets, personal cart drop
+- Course open/closed toggle with optional auto-open/close dates
+- Configurable booking window (default 8 days ahead)
+
+**Booking modal** opens on time slot selection with:
+- Per-player entry: name, member status, equipment checkboxes (Riding Cart, Pull Cart, Club Rental, Personal Cart Drop)
+- Email and phone collected for the person making the booking (player #1) only
+- Logged-in members auto-detected — player #1's member checkbox is locked when they have an active membership
+- Cart pairing: riders paired 2-per-cart with half/full cart rates varying by member status and 9/18 holes
+- Live pricing summary always visible: green fees (included for members), cart fees, equipment fees — all pulled from admin rate settings
 
 **Availability rules (all configurable in Admin → Settings):**
 
@@ -38,12 +46,12 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 | Season open date | `season_start` (MM-DD) | `05-01` |
 | Season close date | `season_end` (MM-DD) | `10-31` |
 | First tee time | `tee_time_open` | `07:00` |
-| Last tee time | `tee_time_close` | `17:48` |
-| Sunset cutoff | `sunset_cutoff_enabled` | `true` |
+| Last tee time | `tee_time_close` | (blank = sunset) |
 | Hours before sunset | `sunset_cutoff_hours` | `2` |
 | Course coordinates | `course_latitude` / `course_longitude` | Pengilly, MN |
+| Auto-close date | `course_auto_close_date` | (blank) |
 
-The sunset cutoff uses a pure astronomical calculation (no API key) — the last available slot updates daily based on the actual sunset time for the configured coordinates. It only applies if it falls *earlier* than `tee_time_close`, so special events like twilight golf can be enabled by toggling `sunset_cutoff_enabled` off or extending `tee_time_close`.
+The sunset cutoff uses a pure astronomical calculation (no API key) — the last available slot updates daily based on the actual sunset time for the configured coordinates. When `tee_time_close` is blank, the sunset cutoff is used automatically. When a close time is set, the sunset cutoff still applies if it falls earlier.
 
 **Private event blocking:** any event marked as Private in Admin → Events blocks online tee time bookings during the event's time window on that date. Affected slots show as "Private Event" in purple on the booking grid.
 
@@ -178,7 +186,10 @@ Charges from Toast are tagged with an orange **TOAST** badge in the billing dash
 
 All configuration is stored in the database. Sections:
 
-- **Course Operation** — open/closed, booking window, green fees, cart fees, season dates, tee time hours, clubhouse hours, sunset cutoff, course coordinates
+- **Tee Time Settings** — course open/closed toggle with auto-open/close date scheduling
+- **Announcement Banner** — site-wide dismissible banner for weather alerts, closures, etc.
+- **Course Operation** — booking window, green fees, season dates, tee time hours, clubhouse hours, sunset cutoff, course coordinates
+- **Cart, Equipment & Range Rates** — per-hole member/non-member cart rates, pull cart, club rental, personal cart drop, storage, range fees
 - **Email (SMTP)** — host, port, credentials, from address
 - **Square Payments** — access token, app ID, location ID, environment
 - **QuickBooks Payments** — client credentials, redirect URI, environment

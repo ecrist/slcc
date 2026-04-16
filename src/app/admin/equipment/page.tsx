@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { SkeletonTable } from "@/components/Skeleton";
 
 interface EquipmentItem {
   id: number;
@@ -257,7 +258,7 @@ export default function EquipmentPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <SkeletonTable rows={5} cols={4} />
       ) : (
         <>
           {grouped.map(({ type, items: group }) => (

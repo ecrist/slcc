@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -35,7 +36,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4">
-      <div className="card w-full max-w-md">
+      <div className="card w-full max-w-md animate-fade-in-up">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-swan-green mb-2">Sign In</h1>
           <p className="text-gray-600">Sign in to book tee times and manage your account.</p>
@@ -66,15 +67,11 @@ function LoginForm() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              className="input-field"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <a href="/forgot-password" className="text-xs text-swan-green hover:underline">Forgot password?</a>
+            </div>
+            <PasswordInput id="login-password" value={password} onChange={setPassword} required autoComplete="current-password" />
           </div>
           <button type="submit" disabled={submitting} className="btn-primary w-full">
             {submitting ? "Signing in…" : "Sign In"}

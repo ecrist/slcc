@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 function RegisterForm() {
   const router = useRouter();
@@ -61,7 +62,7 @@ function RegisterForm() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4">
-      <div className="card w-full max-w-md">
+      <div className="card w-full max-w-md animate-fade-in-up">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-swan-green mb-2">Create Account</h1>
           <p className="text-gray-600">Sign up to book tee times online.</p>
@@ -113,28 +114,13 @@ function RegisterForm() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
-              minLength={8}
-              className="input-field"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
+            <PasswordInput id="reg-password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} required autoComplete="new-password" minLength={8} />
             <p className="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
-              className="input-field"
-              value={form.confirm}
-              onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-            />
+            <PasswordInput id="reg-confirm" value={form.confirm} onChange={(v) => setForm({ ...form, confirm: v })} required autoComplete="new-password" />
           </div>
 
           <button type="submit" disabled={submitting} className="btn-primary w-full">

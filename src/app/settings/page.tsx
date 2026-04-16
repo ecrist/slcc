@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 interface MembershipInfo {
   member_number: string;
@@ -134,10 +135,10 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <h1 className="section-title">Account Settings</h1>
+      <h1 className="section-title animate-fade-in-up stagger-1">Account Settings</h1>
 
       {/* User avatar + info header */}
-      <div className="flex items-center gap-4 mb-10">
+      <div className="flex items-center gap-4 mb-10 animate-fade-in-up stagger-2">
         <div className="w-16 h-16 rounded-full bg-swan-green flex items-center justify-center text-white text-xl font-bold shrink-0">
           {initials}
         </div>
@@ -164,7 +165,7 @@ export default function SettingsPage() {
 
       {/* Membership Section */}
       {membership ? (
-        <div className="card mb-8">
+        <div className="card mb-8 animate-fade-in-up stagger-3">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-lg text-swan-green">Membership</h2>
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -197,7 +198,7 @@ export default function SettingsPage() {
           </div>
         </div>
       ) : (
-        <div className="card mb-8 text-center py-6">
+        <div className="card mb-8 text-center py-6 animate-fade-in-up stagger-3">
           <p className="text-gray-500 mb-3">No active membership found.</p>
           <Link href="/memberships" className="btn-primary py-2 px-6 text-sm inline-block">
             View Memberships
@@ -206,7 +207,7 @@ export default function SettingsPage() {
       )}
 
       {/* Profile Section */}
-      <div className="card mb-8">
+      <div className="card mb-8 animate-fade-in-up stagger-4">
         <h2 className="font-bold text-lg text-swan-green mb-4">Profile</h2>
         <form onSubmit={handleProfileSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -276,50 +277,27 @@ export default function SettingsPage() {
       </div>
 
       {/* Password Section */}
-      <div className="card">
+      <div className="card animate-fade-in-up stagger-5">
         <h2 className="font-bold text-lg text-swan-green mb-4">Change Password</h2>
         <form onSubmit={handlePasswordSave} className="space-y-4">
           <div>
             <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Current Password
             </label>
-            <input
-              id="currentPassword"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none"
-              required
-            />
+            <PasswordInput id="currentPassword" value={currentPassword} onChange={setCurrentPassword} required autoComplete="current-password" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none" />
           </div>
           <div>
             <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
               New Password
             </label>
-            <input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none"
-              required
-              minLength={8}
-            />
+            <PasswordInput id="newPassword" value={newPassword} onChange={setNewPassword} required autoComplete="new-password" minLength={8} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none" />
             <p className="text-gray-400 text-xs mt-1">Minimum 8 characters</p>
           </div>
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Confirm New Password
             </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none"
-              required
-              minLength={8}
-            />
+            <PasswordInput id="confirmPassword" value={confirmPassword} onChange={setConfirmPassword} required autoComplete="new-password" minLength={8} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-swan-green focus:border-swan-green outline-none" />
           </div>
           <div className="pt-2">
             <button

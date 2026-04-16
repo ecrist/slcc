@@ -364,14 +364,14 @@ export default function DeskPage() {
     if (g.personal_cart_drop) tags.push("personal cart");
     if (!tags.length) return null;
     return (
-      <span className="text-slate-400 text-xs">· {tags.join(", ")}</span>
+      <span className="text-gray-400 text-xs">· {tags.join(", ")}</span>
     );
   }
 
   return (
-    <div className="flex flex-col h-full text-white select-none">
+    <div className="flex flex-col h-full text-gray-900 select-none bg-swan-cream">
       {/* ── Header bar ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 py-3 bg-slate-800 border-b border-slate-700 shrink-0">
+      <div className="flex items-center justify-between px-5 py-3 bg-swan-green border-b border-green-900 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           <span className="font-heading font-bold text-lg text-white">Swan Lake CC — Desk</span>
@@ -380,26 +380,26 @@ export default function DeskPage() {
           <div className="grid grid-cols-4 gap-4 text-center">
             <div>
               <p className="text-xl font-bold text-white">{stats.totalReservations}</p>
-              <p className="text-xs text-slate-400">Reservations</p>
+              <p className="text-xs text-green-200">Reservations</p>
             </div>
             <div>
-              <p className="text-xl font-bold text-green-400">{stats.checkedIn}</p>
-              <p className="text-xs text-slate-400">Checked In</p>
+              <p className="text-xl font-bold text-green-300">{stats.checkedIn}</p>
+              <p className="text-xs text-green-200">Checked In</p>
             </div>
             <div>
-              <p className="text-xl font-bold text-blue-400">{stats.walkIns}</p>
-              <p className="text-xs text-slate-400">Walk-Ins</p>
+              <p className="text-xl font-bold text-swan-gold">{stats.walkIns}</p>
+              <p className="text-xs text-green-200">Walk-Ins</p>
             </div>
             <div>
-              <p className="text-xl font-bold text-purple-400">{stats.memberCheckIns}</p>
-              <p className="text-xs text-slate-400">Members</p>
+              <p className="text-xl font-bold text-yellow-200">{stats.memberCheckIns}</p>
+              <p className="text-xs text-green-200">Members</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm text-slate-300">{todayStr}</p>
-            <p className="text-lg font-bold font-mono tabular-nums">{timeStr}</p>
+            <p className="text-sm text-green-200">{todayStr}</p>
+            <p className="text-lg font-bold font-mono tabular-nums text-swan-gold">{timeStr}</p>
           </div>
-          <a href="/" className="text-slate-400 hover:text-white text-xs border border-slate-600 rounded px-2 py-1">
+          <a href="/" className="text-green-200 hover:text-white text-xs border border-green-700 rounded px-2 py-1">
             ← Exit
           </a>
         </div>
@@ -408,45 +408,45 @@ export default function DeskPage() {
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: tee time schedule */}
-        <div className="w-[42%] border-r border-slate-700 flex flex-col overflow-hidden">
-          <div className="px-4 py-2 bg-slate-800 border-b border-slate-700 shrink-0">
-            <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+        <div className="w-[42%] border-r border-gray-200 flex flex-col overflow-hidden bg-white">
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
               Today&apos;s Tee Times
             </h2>
           </div>
           <div className="overflow-y-auto flex-1 py-1">
             {loading ? (
-              <p className="text-slate-500 text-center py-12">Loading…</p>
+              <p className="text-gray-400 text-center py-12">Loading…</p>
             ) : groups.length === 0 ? (
-              <p className="text-slate-500 text-center py-12 text-sm">No reservations today</p>
+              <p className="text-gray-400 text-center py-12 text-sm">No reservations today</p>
             ) : (
               groups.map((g) => (
                 <button
                   key={g.id}
                   onClick={() => toggleCheckin(g)}
-                  className={`w-full text-left px-4 py-3.5 border-b border-slate-700/50 transition-colors active:scale-[0.99] ${
+                  className={`w-full text-left px-4 py-3.5 border-b border-gray-100 transition-colors active:scale-[0.99] ${
                     g.checked_in
-                      ? "bg-green-900/30 hover:bg-green-900/50"
-                      : "hover:bg-slate-800"
+                      ? "bg-green-50 hover:bg-green-100"
+                      : "hover:bg-gray-50"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-bold ${
-                        g.checked_in ? "bg-green-500 text-white" : "bg-slate-700 text-slate-300"
+                        g.checked_in ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
                       }`}>
                         {g.checked_in ? "✓" : fmtTime(g.time).split(" ")[0]}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-white truncate">{g.player_name}</span>
+                          <span className="font-semibold text-gray-900 truncate">{g.player_name}</span>
                           {g.checked_in && (
-                            <span className="text-xs text-green-400 shrink-0">
+                            <span className="text-xs text-green-600 shrink-0">
                               {g.checked_in_at ? fmtCheckinTime(g.checked_in_at) : "checked in"}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                        <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
                           <span>{fmtTime(g.time)}</span>
                           <span>·</span>
                           <span>{g.players}p</span>
@@ -458,7 +458,7 @@ export default function DeskPage() {
                       </div>
                     </div>
                     <div className={`shrink-0 text-xs px-2 py-1 rounded font-medium ${
-                      g.checked_in ? "bg-green-500/20 text-green-300" : "bg-slate-700 text-slate-400"
+                      g.checked_in ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
                     }`}>
                       {g.checked_in ? "In" : "Tap to check in"}
                     </div>
@@ -470,17 +470,17 @@ export default function DeskPage() {
         </div>
 
         {/* Right: check-in panel */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden bg-white">
           {/* Tabs */}
-          <div className="flex border-b border-slate-700 bg-slate-800 shrink-0">
+          <div className="flex border-b border-gray-200 bg-white shrink-0">
             {PANEL_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => { setPanel(tab.id); if (tab.id !== "nfc") exitNfcMode(); }}
                 className={`flex-1 py-3 text-sm font-semibold transition-colors ${
                   panel === tab.id
-                    ? "text-white border-b-2 border-green-400 bg-slate-700/50"
-                    : "text-slate-400 hover:text-white"
+                    ? "text-swan-green border-b-2 border-swan-green bg-green-50/50"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 {tab.label}
@@ -505,13 +505,13 @@ export default function DeskPage() {
 
                 {!nfcMode && !nfcResult && (
                   <div className="flex-1 flex flex-col items-center justify-center gap-6">
-                    <div className="text-slate-500 text-center">
-                      <svg className="h-20 w-20 mx-auto mb-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="text-gray-400 text-center">
+                      <svg className="h-20 w-20 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2}
                           d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
-                      <p className="text-lg font-semibold text-slate-300 mb-1">NFC Member Check-In</p>
-                      <p className="text-sm text-slate-500">Tap the button below, then present a member card</p>
+                      <p className="text-lg font-semibold text-gray-700 mb-1">NFC Member Check-In</p>
+                      <p className="text-sm text-gray-400">Tap the button below, then present a member card</p>
                     </div>
                     <button
                       onClick={enterNfcMode}
@@ -521,7 +521,7 @@ export default function DeskPage() {
                     </button>
                     <button
                       onClick={startWebNfc}
-                      className="text-slate-400 hover:text-white text-sm border border-slate-600 rounded-lg px-4 py-2"
+                      className="text-gray-500 hover:text-gray-700 text-sm border border-gray-300 rounded-lg px-4 py-2"
                     >
                       Start Web NFC (Chrome / Android)
                     </button>
@@ -537,10 +537,10 @@ export default function DeskPage() {
                       </svg>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-white mb-1">Waiting for card…</p>
-                      <p className="text-slate-400 text-sm">Present NFC card or badge to the reader</p>
+                      <p className="text-xl font-bold text-gray-900 mb-1">Waiting for card…</p>
+                      <p className="text-gray-500 text-sm">Present NFC card or badge to the reader</p>
                     </div>
-                    <button onClick={exitNfcMode} className="text-slate-400 hover:text-white text-sm border border-slate-600 rounded-lg px-4 py-2">
+                    <button onClick={exitNfcMode} className="text-gray-500 hover:text-gray-700 text-sm border border-gray-300 rounded-lg px-4 py-2">
                       Cancel
                     </button>
                   </div>
@@ -548,36 +548,36 @@ export default function DeskPage() {
 
                 {nfcResult?.error && (
                   <div className="flex-1 flex flex-col items-center justify-center gap-6">
-                    <div className="w-20 h-20 rounded-full bg-red-900/40 flex items-center justify-center">
+                    <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
                       <svg className="h-10 w-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-white mb-1">Not recognised</p>
-                      <p className="text-red-400 text-sm">{nfcResult.error}</p>
+                      <p className="text-xl font-bold text-gray-900 mb-1">Not recognised</p>
+                      <p className="text-red-500 text-sm">{nfcResult.error}</p>
                     </div>
                     <button onClick={() => { setNfcResult(null); enterNfcMode(); }}
-                      className="bg-slate-700 hover:bg-slate-600 text-white rounded-xl px-6 py-3 font-semibold">
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl px-6 py-3 font-semibold border border-gray-200">
                       Try Again
                     </button>
-                    <button onClick={exitNfcMode} className="text-slate-400 hover:text-white text-sm">Cancel</button>
+                    <button onClick={exitNfcMode} className="text-gray-400 hover:text-gray-600 text-sm">Cancel</button>
                   </div>
                 )}
 
                 {nfcResult?.member && (
                   <div className="flex-1 flex flex-col items-center justify-center gap-5">
-                    <div className="w-20 h-20 rounded-full bg-green-900/50 flex items-center justify-center">
-                      <svg className="h-10 w-10 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="w-20 h-20 rounded-full bg-green-50 flex items-center justify-center">
+                      <svg className="h-10 w-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-white mb-1">
+                      <p className="text-3xl font-bold text-gray-900 mb-1">
                         {nfcResult.member.first_name} {nfcResult.member.last_name}
                       </p>
-                      <p className="text-slate-400 text-sm">{nfcResult.member.email}</p>
-                      <p className="text-green-400 text-sm mt-1">
+                      <p className="text-gray-500 text-sm">{nfcResult.member.email}</p>
+                      <p className="text-green-600 text-sm mt-1">
                         {MEMBERSHIP_TYPES[nfcResult.member.membership_type as MembershipType]?.name ?? nfcResult.member.membership_type} · Active
                       </p>
                     </div>
@@ -588,7 +588,7 @@ export default function DeskPage() {
                       Confirm Check-In
                     </button>
                     <button onClick={() => { setNfcResult(null); enterNfcMode(); }}
-                      className="text-slate-400 hover:text-white text-sm">
+                      className="text-gray-400 hover:text-gray-600 text-sm">
                       Scan Another
                     </button>
                   </div>
@@ -600,7 +600,7 @@ export default function DeskPage() {
             {panel === "search" && (
               <div className="p-5">
                 <div className="relative mb-4">
-                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
@@ -609,10 +609,10 @@ export default function DeskPage() {
                     placeholder="Search member name or email…"
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-xl pl-12 pr-4 py-4 text-white text-lg placeholder-slate-500 focus:outline-none focus:border-green-500"
+                    className="w-full bg-white border border-gray-300 rounded-xl pl-12 pr-4 py-4 text-gray-900 text-lg placeholder-gray-400 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green"
                   />
                   {searchLoading && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-300 border-t-swan-green rounded-full animate-spin" />
                   )}
                 </div>
 
@@ -622,13 +622,13 @@ export default function DeskPage() {
                       <button
                         key={m.id}
                         onClick={() => checkInMember(m)}
-                        className="w-full flex items-center justify-between bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 rounded-xl px-4 py-4 transition-colors text-left"
+                        className="w-full flex items-center justify-between bg-white hover:bg-gray-50 active:bg-gray-100 border border-gray-200 rounded-xl px-4 py-4 transition-colors text-left shadow-sm"
                       >
                         <div>
-                          <p className="font-bold text-white text-lg">
+                          <p className="font-bold text-gray-900 text-lg">
                             {m.first_name} {m.last_name}
                           </p>
-                          <p className="text-slate-400 text-sm">
+                          <p className="text-gray-500 text-sm">
                             {m.email} · {MEMBERSHIP_TYPES[m.membership_type as MembershipType]?.name ?? m.membership_type}
                           </p>
                         </div>
@@ -641,11 +641,11 @@ export default function DeskPage() {
                 )}
 
                 {searchQuery.length >= 2 && !searchLoading && searchResults.length === 0 && (
-                  <p className="text-slate-500 text-center py-8">No active members found for &ldquo;{searchQuery}&rdquo;</p>
+                  <p className="text-gray-400 text-center py-8">No active members found for &ldquo;{searchQuery}&rdquo;</p>
                 )}
 
                 {searchQuery.length === 0 && (
-                  <p className="text-slate-600 text-center py-12 text-sm">Type at least 2 characters to search</p>
+                  <p className="text-gray-300 text-center py-12 text-sm">Type at least 2 characters to search</p>
                 )}
               </div>
             )}
@@ -655,9 +655,9 @@ export default function DeskPage() {
               <form onSubmit={handleWalkIn} className="p-5 space-y-4">
                 {/* Contact lookup */}
                 <div className="relative">
-                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Returning Guest?
-                    {selectedContactId && <span className="ml-2 text-green-400 text-xs">linked</span>}
+                    {selectedContactId && <span className="ml-2 text-green-600 text-xs">linked</span>}
                   </label>
                   <input
                     type="text"
@@ -665,18 +665,18 @@ export default function DeskPage() {
                     placeholder="Search by name to link a contact record…"
                     value={contactQuery}
                     onChange={(e) => handleContactSearch(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green"
                   />
                   {contactResults.length > 0 && (
-                    <div className="absolute z-10 left-0 right-0 bg-slate-700 border border-slate-600 rounded-xl mt-1 overflow-hidden shadow-xl">
+                    <div className="absolute z-10 left-0 right-0 bg-white border border-gray-200 rounded-xl mt-1 overflow-hidden shadow-xl">
                       {contactResults.map((c) => (
                         <button
                           key={c.id}
                           type="button"
                           onClick={() => selectContact(c)}
-                          className="w-full text-left px-4 py-2.5 hover:bg-slate-600 text-white text-sm border-b border-slate-600 last:border-0"
+                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-gray-900 text-sm border-b border-gray-100 last:border-0"
                         >
-                          {c.first_name} {c.last_name}{c.zip ? <span className="text-slate-400 ml-1.5">({c.zip})</span> : null}
+                          {c.first_name} {c.last_name}{c.zip ? <span className="text-gray-400 ml-1.5">({c.zip})</span> : null}
                         </button>
                       ))}
                     </div>
@@ -684,73 +684,73 @@ export default function DeskPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Name *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                     <input
                       type="text"
                       required
                       placeholder="Guest name"
                       value={walkIn.name}
                       onChange={(e) => setWalkIn({ ...walkIn, name: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white text-lg placeholder-slate-500 focus:outline-none focus:border-green-500"
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-lg placeholder-gray-400 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <input
                       type="email"
                       placeholder="optional"
                       value={walkIn.email}
                       onChange={(e) => setWalkIn({ ...walkIn, email: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-green-500"
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Players</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Players</label>
                     <select value={walkIn.players} onChange={(e) => setWalkIn({ ...walkIn, players: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-500">
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green">
                       {[1,2,3,4,5,6,7,8].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Holes</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Holes</label>
                     <select value={walkIn.holes} onChange={(e) => setWalkIn({ ...walkIn, holes: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-500">
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green">
                       <option value="9">9</option>
                       <option value="18">18</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Carts</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Carts</label>
                     <select value={walkIn.carts} onChange={(e) => setWalkIn({ ...walkIn, carts: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-500">
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green">
                       {[0,1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Buggies</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Buggies</label>
                     <select value={walkIn.buggies} onChange={(e) => setWalkIn({ ...walkIn, buggies: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-500">
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green">
                       {[0,1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Club Sets</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Club Sets</label>
                     <select value={walkIn.clubs} onChange={(e) => setWalkIn({ ...walkIn, clubs: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-500">
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green">
                       {[0,1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div className="flex items-center gap-3 pt-5">
                     <input type="checkbox" id="pcd" checked={walkIn.personal_cart_drop}
                       onChange={(e) => setWalkIn({ ...walkIn, personal_cart_drop: e.target.checked })}
-                      className="w-5 h-5 rounded text-green-500" />
-                    <label htmlFor="pcd" className="text-sm text-slate-300">Personal cart drop</label>
+                      className="w-5 h-5 rounded text-green-600" />
+                    <label htmlFor="pcd" className="text-sm text-gray-700">Personal cart drop</label>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                     <input type="text" placeholder="optional" value={walkIn.notes}
                       onChange={(e) => setWalkIn({ ...walkIn, notes: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-green-500" />
+                      className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swan-green focus:ring-1 focus:ring-swan-green" />
                   </div>
                 </div>
                 <button type="submit" disabled={walkInSubmitting}
@@ -762,25 +762,25 @@ export default function DeskPage() {
           </div>
 
           {/* Recent check-ins */}
-          <div className="border-t border-slate-700 bg-slate-800/50 shrink-0" style={{ maxHeight: "220px" }}>
-            <div className="px-4 py-2 border-b border-slate-700">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recent Check-Ins Today</h3>
+          <div className="border-t border-gray-200 bg-gray-50 shrink-0" style={{ maxHeight: "220px" }}>
+            <div className="px-4 py-2 border-b border-gray-200">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Check-Ins Today</h3>
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: "176px" }}>
               {recentCheckIns.length === 0 ? (
-                <p className="text-slate-600 text-sm text-center py-4">No check-ins yet today</p>
+                <p className="text-gray-400 text-sm text-center py-4">No check-ins yet today</p>
               ) : (
                 recentCheckIns.map((c) => (
-                  <div key={c.id} className="flex items-center gap-3 px-4 py-2 border-b border-slate-700/40">
+                  <div key={c.id} className="flex items-center gap-3 px-4 py-2 border-b border-gray-100">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${
                       c.type === "nfc" ? "bg-purple-400" :
                       c.type === "member" ? "bg-blue-400" :
-                      c.type === "tee_time" ? "bg-green-400" : "bg-slate-400"
+                      c.type === "tee_time" ? "bg-green-400" : "bg-gray-400"
                     }`} />
-                    <span className="font-medium text-white text-sm truncate flex-1">{c.name}</span>
-                    <span className="text-slate-500 text-xs">{c.players}p · {c.holes}h</span>
-                    <span className="text-slate-500 text-xs shrink-0">{fmtCheckinTime(c.checked_in_at)}</span>
-                    <span className="text-xs text-slate-600 capitalize shrink-0 w-14 text-right">{c.type.replace("_", "-")}</span>
+                    <span className="font-medium text-gray-900 text-sm truncate flex-1">{c.name}</span>
+                    <span className="text-gray-400 text-xs">{c.players}p · {c.holes}h</span>
+                    <span className="text-gray-400 text-xs shrink-0">{fmtCheckinTime(c.checked_in_at)}</span>
+                    <span className="text-xs text-gray-400 capitalize shrink-0 w-14 text-right">{c.type.replace("_", "-")}</span>
                   </div>
                 ))
               )}

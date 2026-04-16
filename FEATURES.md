@@ -83,26 +83,47 @@ All editable via Admin → Settings. No rebuild needed.
 | Key | Default | Notes |
 |-----|---------|-------|
 | `course_open` | `true` | Enables/disables online booking |
-| `booking_days_ahead` | `7` | How far ahead guests can book |
-| `green_fee_9_holes` | `25` | Display only |
-| `green_fee_18_holes` | `35` | Display only |
-| `cart_fee_per_9` | `10` | Per cart per 9 holes |
-| `buggy_fee` | `5` | Per buggy per round |
-| `clubs_fee` | `15` | Per set per round |
-| `personal_cart_drop_fee` | `15` | Per day |
+| `booking_days_ahead` | `8` | How far ahead guests can book |
+| `course_auto_open_date` | (blank) | YYYY-MM-DD — auto-set `course_open=true` on this date |
+| `course_auto_close_date` | (blank) | YYYY-MM-DD — auto-set `course_open=false` on this date |
+| `green_fee_9_holes` | `25` | Used in booking pricing for non-members |
+| `green_fee_18_holes` | `35` | Used in booking pricing for non-members |
 | `cart_storage_fee` | `250` | Per season, used in billing |
 | `contact_phone` | `(218) 885-3543` | |
 | `contact_email` | `golf@swanlakecc.com` | |
 | `season_start` | `05-01` | **MM-DD format** — enforced on bookings |
 | `season_end` | `10-31` | **MM-DD format** — enforced on bookings |
 | `tee_time_open` | `07:00` | Filters booking grid |
-| `tee_time_close` | `17:48` | Overridden by sunset cutoff if earlier |
+| `tee_time_close` | (blank) | Blank = sunset-based cutoff; if set, overridden by sunset cutoff if earlier |
 | `clubhouse_open` | `06:00` | Display only |
 | `clubhouse_close` | `20:00` | Display only |
-| `sunset_cutoff_enabled` | `true` | Auto-close N hrs before sunset |
 | `sunset_cutoff_hours` | `2` | Hours before sunset to stop bookings |
 | `course_latitude` | `47.72` | Used for sunset calculation |
 | `course_longitude` | `-93.01` | Used for sunset calculation |
+
+### Cart, Equipment & Range Rates
+All managed in Admin → Settings → Cart, Equipment & Range Rates. Used for booking pricing and the Rates & Fees page.
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `cart_member_half_9` | `10` | Shared cart, member, 9 holes |
+| `cart_member_full_9` | `17.50` | Solo cart, member, 9 holes |
+| `cart_member_half_18` | `15` | Shared cart, member, 18 holes |
+| `cart_member_full_18` | `25` | Solo cart, member, 18 holes |
+| `cart_nonmember_half_9` | `17.50` | Shared cart, non-member, 9 holes |
+| `cart_nonmember_full_9` | `30` | Solo cart, non-member, 9 holes |
+| `cart_nonmember_half_18` | `25` | Shared cart, non-member, 18 holes |
+| `cart_nonmember_full_18` | `40` | Solo cart, non-member, 18 holes |
+| `pull_cart_fee` | `3` | Per pull cart per round |
+| `club_rental_9` | `15` | Club set rental, 9 holes |
+| `club_rental_18` | `20` | Club set rental, 18 holes |
+| `personal_cart_drop_fee` | `15` | Daily fee for guest's own cart |
+
+### Announcement Banner
+| Key | Default | Notes |
+|-----|---------|-------|
+| `announcement_enabled` | `false` | Show/hide site-wide banner |
+| `announcement_message` | (blank) | Banner text content |
 
 ### Email (SMTP — Nodemailer)
 `smtp_host`, `smtp_port`, `smtp_secure`, `smtp_user`, `smtp_pass`, `smtp_from`
@@ -123,17 +144,30 @@ All editable via Admin → Settings. No rebuild needed.
 
 ## Tee Time Booking (`/tee-times`)
 
-- 12-minute slots, 07:00–17:48 (55 total), filtered by `tee_time_open`/`tee_time_close`
+- 12-minute slots, filtered by `tee_time_open`/`tee_time_close` (blank close = sunset-based)
 - Party sizes 1–12; 5–8 players = 2 slots, 9–12 = 3 consecutive slots
 - Concurrency: `BEGIN IMMEDIATE` transaction + unique partial index
 - Guest booking allowed (no login required)
 - Confirmation email sent if email provided
+- Course open/closed toggle with optional auto-open/close dates
+- Configurable booking window (`booking_days_ahead`, default 8 days)
+- Past time slots hidden for today; "No tee times available" shown when none remain
+
+**Booking modal:**
+- Opens on time slot selection (no layout shift)
+- Per-player entry: name, member checkbox, equipment checkboxes (Riding Cart, Pull Cart, Club Rental, Personal Cart Drop)
+- Email and phone collected for player #1 only (the person making the booking)
+- Logged-in members: player #1's member checkbox auto-checked and locked based on active membership lookup
+- Cart pairing: riders paired 2-per-cart; shared riders pay half cart rate, solo riders pay full cart rate; rates vary by member/non-member and 9/18 holes
+- Pricing summary always visible: green fees (included for members, charged for non-members), cart fees, pull cart, club rental, personal cart drop
+- All pricing pulled from Cart, Equipment & Range Rates settings section
+- Body scroll locked while modal is open
 
 **Availability enforcement (all server-side + reflected in UI):**
-1. `course_open` = false → all bookings blocked
-2. Season dates (MM-DD comparison against date's month-day)
+1. `course_open` = false → all bookings blocked, entire booking UI hidden
+2. `course_auto_close_date` — dates on or after show "Online bookings are not available"
 3. `tee_time_open` / `tee_time_close` window
-4. Sunset cutoff — astronomical calculation (`src/lib/sunset.ts`, NOAA algorithm, no API key)
+4. Sunset cutoff — astronomical calculation (`src/lib/sunset.ts`, NOAA algorithm, no API key); when `tee_time_close` is blank, sunset minus `sunset_cutoff_hours` is the cutoff
 5. Private events — `is_public=0` events block their time window (whole day if no start/end)
 6. Equipment availability — capped by inventory minus same-day bookings
 
@@ -289,7 +323,9 @@ NFC cards: UUID token stored on membership (`nfc_token`). iOS uses tap-to-open U
 - **Driving Range** table card (buckets, passes)
 
 ### Tee Times (`/tee-times`)
-- "Clubhouse Hours:" label (changed from "Clubhouse:")
+- Booking modal with per-player equipment selection and live pricing
+- Membership auto-detection for logged-in users
+- See "Tee Time Booking" section above for full details
 
 ---
 

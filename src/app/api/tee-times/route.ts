@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, execute, withTransaction } from "@/lib/db";
-import { getConfigValue } from "@/lib/admin";
+import { getConfigValue, setConfigValue } from "@/lib/admin";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import { sendTeeTimeConfirmation } from "@/lib/email";
 import { sunsetTime, subtractHours } from "@/lib/sunset";
+import { auth } from "@/auth";
+
+/** Check auto-open/close dates and flip course_open if needed */
+async function checkAutoSeasonToggle() {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const courseOpen = await getConfigValue("course_open");
+  const autoOpen = await getConfigValue("course_auto_open_date");
+  const autoClose = await getConfigValue("course_auto_close_date");
+
+  if (courseOpen === "true" && autoClose && today >= autoClose) {
+    await setConfigValue("course_open", "false");
+    await setConfigValue("course_auto_close_date", ""); // Clear so it doesn't re-trigger
+  } else if (courseOpen !== "true" && autoOpen && today >= autoOpen) {
+    await setConfigValue("course_open", "true");
+    await setConfigValue("course_auto_open_date", ""); // Clear so it doesn't re-trigger
+  }
+}
 
 async function getEquipmentAvailability(date: string) {
   const cartFeePerNine    = parseFloat((await getConfigValue("cart_fee_per_9"))         ?? "10");
@@ -49,35 +66,81 @@ async function getEquipmentAvailability(date: string) {
   };
 }
 
+async function getRates() {
+  const [
+    cmh9, cmf9, cmh18, cmf18,
+    cnh9, cnf9, cnh18, cnf18,
+    pullCart, club9, club18, personalDrop,
+    gf9, gf18,
+  ] = await Promise.all([
+    getConfigValue("cart_member_half_9"),
+    getConfigValue("cart_member_full_9"),
+    getConfigValue("cart_member_half_18"),
+    getConfigValue("cart_member_full_18"),
+    getConfigValue("cart_nonmember_half_9"),
+    getConfigValue("cart_nonmember_full_9"),
+    getConfigValue("cart_nonmember_half_18"),
+    getConfigValue("cart_nonmember_full_18"),
+    getConfigValue("pull_cart_fee"),
+    getConfigValue("club_rental_9"),
+    getConfigValue("club_rental_18"),
+    getConfigValue("personal_cart_drop_fee"),
+    getConfigValue("green_fee_9_holes"),
+    getConfigValue("green_fee_18_holes"),
+  ]);
+  return {
+    cartMemberHalf9:      parseFloat(cmh9  ?? "10"),
+    cartMemberFull9:      parseFloat(cmf9  ?? "17.50"),
+    cartMemberHalf18:     parseFloat(cmh18 ?? "15"),
+    cartMemberFull18:     parseFloat(cmf18 ?? "25"),
+    cartNonmemberHalf9:   parseFloat(cnh9  ?? "17.50"),
+    cartNonmemberFull9:   parseFloat(cnf9  ?? "30"),
+    cartNonmemberHalf18:  parseFloat(cnh18 ?? "25"),
+    cartNonmemberFull18:  parseFloat(cnf18 ?? "40"),
+    pullCartFee:          parseFloat(pullCart ?? "3"),
+    clubRental9:          parseFloat(club9 ?? "15"),
+    clubRental18:         parseFloat(club18 ?? "20"),
+    personalCartDropFee:  parseFloat(personalDrop ?? "15"),
+    greenFee9:            parseFloat(gf9 ?? "20"),
+    greenFee18:           parseFloat(gf18 ?? "35"),
+  };
+}
+
 export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get("date");
   if (!date) {
     return NextResponse.json({ error: "Date parameter required" }, { status: 400 });
   }
 
+  // Auto-toggle course open/close based on scheduled dates
+  await checkAutoSeasonToggle();
+  const courseOpen = (await getConfigValue("course_open")) === "true";
+
   const [
-    seasonStart, seasonEnd,
     teeTimeOpen, teeTimeClose,
     clubhouseOpen, clubhouseClose,
-    sunsetEnabled, sunsetCutoffHours,
+    sunsetCutoffHours,
     latStr, lngStr,
+    bookingDaysAhead,
+    autoCloseDate,
   ] = await Promise.all([
-    getConfigValue("season_start"),
-    getConfigValue("season_end"),
     getConfigValue("tee_time_open"),
     getConfigValue("tee_time_close"),
     getConfigValue("clubhouse_open"),
     getConfigValue("clubhouse_close"),
-    getConfigValue("sunset_cutoff_enabled"),
     getConfigValue("sunset_cutoff_hours"),
     getConfigValue("course_latitude"),
     getConfigValue("course_longitude"),
+    getConfigValue("booking_days_ahead"),
+    getConfigValue("course_auto_close_date"),
   ]);
 
-  // Compute effective last tee time — sunset cutoff overrides tee_time_close when enabled
+  // Compute effective last tee time
+  // When tee_time_close is blank, automatically use sunset-based cutoff
   let effectiveTeeTimeClose = teeTimeClose;
   let sunsetStr: string | null = null;
-  if (sunsetEnabled === "true") {
+  const useSunset = !teeTimeClose; // blank = sunset-based
+  {
     const lat = parseFloat(latStr ?? "47.72");
     const lng = parseFloat(lngStr ?? "-93.01");
     const cutoff = parseFloat(sunsetCutoffHours ?? "2");
@@ -86,8 +149,11 @@ export async function GET(request: NextRequest) {
     sunsetStr = sunsetTime(date, lat, lng, utcOffset);
     if (sunsetStr) {
       const cutoffTime = subtractHours(sunsetStr, cutoff);
-      // Only apply if it's earlier than the configured close time (or if none set)
-      if (!effectiveTeeTimeClose || cutoffTime < effectiveTeeTimeClose) {
+      if (useSunset) {
+        // No configured close time — use sunset cutoff
+        effectiveTeeTimeClose = cutoffTime;
+      } else if (cutoffTime < effectiveTeeTimeClose!) {
+        // Configured close time exists but sunset cutoff is earlier
         effectiveTeeTimeClose = cutoffTime;
       }
     }
@@ -104,20 +170,38 @@ export async function GET(request: NextRequest) {
     [date]
   );
   const equipment = await getEquipmentAvailability(date);
+  const rates = await getRates();
+
+  // Detect membership status for logged-in user
+  let userIsMember = false;
+  try {
+    const session = await auth();
+    if (session?.user?.email) {
+      const membership = await queryOne<{ id: number }>(
+        "SELECT id FROM memberships WHERE LOWER(email) = LOWER($1) AND status = 'active' LIMIT 1",
+        [session.user.email]
+      );
+      userIsMember = !!membership;
+    }
+  } catch {
+    // Auth not available or error — leave as false
+  }
 
   return NextResponse.json({
     bookedSlots,
     equipment,
-    seasonStart,
-    seasonEnd,
+    rates,
+    courseOpen,
     teeTimeOpen,
     teeTimeClose: effectiveTeeTimeClose,
     teeTimeCloseRaw: teeTimeClose,
     clubhouseOpen,
     clubhouseClose,
     sunsetTime: sunsetStr,
-    sunsetCutoffEnabled: sunsetEnabled === "true",
     privateEvents,
+    bookingDaysAhead: parseInt(bookingDaysAhead ?? "8") || 8,
+    autoCloseDate: autoCloseDate ?? null,
+    userIsMember,
   });
 }
 
@@ -132,31 +216,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  // Check course_open and apply auto-open/close date logic
+  const courseOpen = await getConfigValue("course_open");
+  if (courseOpen !== "true") {
+    return NextResponse.json({ error: "Online tee time bookings are currently closed." }, { status: 400 });
+  }
+
   const [
-    seasonStart, seasonEnd,
-    teeTimeClose, sunsetEnabled, sunsetCutoffHours, latStr, lngStr,
+    teeTimeClose, sunsetCutoffHours, latStr, lngStr,
   ] = await Promise.all([
-    getConfigValue("season_start"),
-    getConfigValue("season_end"),
     getConfigValue("tee_time_close"),
-    getConfigValue("sunset_cutoff_enabled"),
     getConfigValue("sunset_cutoff_hours"),
     getConfigValue("course_latitude"),
     getConfigValue("course_longitude"),
   ]);
 
-  // season_start / season_end are stored as MM-DD; compare against the month-day of the requested date
-  const monthDay = date.slice(5); // "YYYY-MM-DD" → "MM-DD"
-  if (seasonStart && monthDay < seasonStart) {
-    return NextResponse.json({ error: `The course season begins on ${seasonStart}. Bookings are not available before that date.` }, { status: 400 });
-  }
-  if (seasonEnd && monthDay > seasonEnd) {
-    return NextResponse.json({ error: `The course season ended on ${seasonEnd}. Bookings are not available after that date.` }, { status: 400 });
-  }
-
-  // Enforce sunset cutoff
+  // Enforce sunset cutoff — when tee_time_close is blank, sunset is the cutoff
   let effectiveTeeTimeClose = teeTimeClose;
-  if (sunsetEnabled === "true") {
+  {
     const lat = parseFloat(latStr ?? "47.72");
     const lng = parseFloat(lngStr ?? "-93.01");
     const cutoff = parseFloat(sunsetCutoffHours ?? "2");

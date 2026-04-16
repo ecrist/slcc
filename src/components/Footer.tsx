@@ -1,4 +1,51 @@
-export default function Footer() {
+import { getConfigValue } from "@/lib/admin";
+
+function fmt12h(time: string): string {
+  if (!time || time.includes("AM") || time.includes("PM")) return time || "";
+  const [h, m] = time.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${display}:${m} ${ampm}`;
+}
+
+export default async function Footer() {
+  let displayPhone = "(218) 885-3543";
+  let displayEmail = "golf@swanlakecc.com";
+  let chOpen = "6:00 AM";
+  let chClose = "8:00 PM";
+  let sStart = "05-01";
+  let sEnd = "10-31";
+
+  try {
+    const [phone, email, clubhouseOpen, clubhouseClose, seasonStart, seasonEnd] =
+      await Promise.all([
+        getConfigValue("contact_phone"),
+        getConfigValue("contact_email"),
+        getConfigValue("clubhouse_open"),
+        getConfigValue("clubhouse_close"),
+        getConfigValue("season_start"),
+        getConfigValue("season_end"),
+      ]);
+
+    if (phone) displayPhone = phone;
+    if (email) displayEmail = email;
+    if (clubhouseOpen) chOpen = fmt12h(clubhouseOpen);
+    if (clubhouseClose) chClose = fmt12h(clubhouseClose);
+    if (seasonStart) sStart = seasonStart;
+    if (seasonEnd) sEnd = seasonEnd;
+  } catch {
+    // DB not available during build — use defaults
+  }
+
+  // Convert MM-DD to month name
+  function monthName(mmdd: string): string {
+    const [mm] = (mmdd || "").split("-");
+    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    return months[parseInt(mm) - 1] || "";
+  }
+  const seasonLabel = `${monthName(sStart)} - ${monthName(sEnd)}`;
+
   return (
     <footer className="bg-swan-dark text-gray-300 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -14,16 +61,15 @@ export default function Footer() {
             <h3 className="text-white font-bold text-lg mb-3">Contact</h3>
             <div className="text-sm space-y-2">
               <p>Pengilly, MN 55775</p>
-              <p>Phone: (218) 885-3543</p>
-              <p>Email: golf@swanlakecc.com</p>
+              <p>Phone: <a href={`tel:${displayPhone.replace(/[^\d+]/g, "")}`} className="hover:text-white transition-colors">{displayPhone}</a></p>
+              <p>Email: <a href={`mailto:${displayEmail}`} className="hover:text-white transition-colors">{displayEmail}</a></p>
             </div>
           </div>
           <div>
             <h3 className="text-white font-bold text-lg mb-3">Hours</h3>
             <div className="text-sm space-y-2">
-              <p>Course: Dawn to Dusk (May - October)</p>
-              <p>Pro Shop: 7:00 AM - 6:00 PM</p>
-              <p>Clubhouse: 11:00 AM - 9:00 PM</p>
+              <p>Course: Dawn to Dusk ({seasonLabel})</p>
+              <p>Clubhouse: {chOpen} - {chClose}</p>
             </div>
           </div>
         </div>

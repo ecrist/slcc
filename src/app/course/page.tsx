@@ -1,6 +1,15 @@
 import HoleFlyover from '@/components/HoleFlyover'
+import { getConfigValue } from '@/lib/admin'
 
-export default function CoursePage() {
+export const dynamic = "force-dynamic";
+
+export default async function CoursePage() {
+  const [rangeSmall, rangeLarge] = await Promise.all([
+    getConfigValue("range_small_bag"),
+    getConfigValue("range_large_bag"),
+  ]);
+  const smallPrice = rangeSmall || "5";
+  const largePrice = rangeLarge || "7";
   const scorecard = [
     { hole: 1, par: "4/5", hcp: 2, blue: 430, white: 414, red: 388 },
     { hole: 2, par: 3, hcp: 3, blue: 196, white: 162, red: 141 },
@@ -23,9 +32,9 @@ export default function CoursePage() {
   return (
     <div>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="section-title">Golf Course Overview</h1>
-        <p className="text-gray-500 mb-10">9 Holes &middot; Par 36 &middot; Est. 1929</p>
-        <div className="prose prose-lg max-w-none text-gray-700">
+        <h1 className="section-title animate-fade-in-up stagger-1">Golf Course Overview</h1>
+        <p className="text-gray-500 mb-10 animate-fade-in-up stagger-1">9 Holes &middot; Par 36 &middot; Est. 1929</p>
+        <div className="prose prose-lg max-w-none text-gray-700 animate-fade-in-up stagger-2">
           <p>
             Swan Lake Country Club is a par-36 scenic 9-hole golf course with MGA ratings. The blue
             tees offer a challenging 3,235 yards followed by white tees playing 3,079 yards. The red
@@ -44,8 +53,8 @@ export default function CoursePage() {
       {/* Tee Information */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title text-center mb-8">Tee Options</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <h2 className="section-title text-center mb-8 animate-fade-in-up stagger-3">Tee Options</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in-up stagger-3">
             <div className="card text-center">
               <div className="inline-block w-5 h-5 rounded-full bg-blue-600 mb-3"></div>
               <h3 className="font-bold text-lg">Blue Tees</h3>
@@ -72,7 +81,7 @@ export default function CoursePage() {
       </section>
 
       {/* Scorecard */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 animate-fade-in-up stagger-4">
         <h2 className="section-title text-center mb-8">Scorecard</h2>
         <div className="card overflow-x-auto">
           <table className="w-full text-center text-sm">
@@ -130,14 +139,14 @@ export default function CoursePage() {
       </section>
 
       {/* Amenities */}
-      <section className="bg-gray-50">
+      <section className="bg-gray-50 animate-fade-in-up stagger-5">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <h2 className="section-title text-center mb-8">Amenities</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="card">
               <h3 className="font-bold text-lg text-swan-green mb-2">Driving Range</h3>
               <p className="text-gray-600">
-                Practice your swing at our driving range. Small bag $5, large bag $7.
+                Practice your swing at our driving range. Small bag ${smallPrice}, large bag ${largePrice}.
                 Closed Fridays 8am&ndash;10am in June and July for youth programs.
               </p>
             </div>

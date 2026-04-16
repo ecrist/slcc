@@ -2,9 +2,9 @@ export default function AboutPage() {
   return (
     <div>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="section-title">About Swan Lake</h1>
-        <p className="text-gray-500 mb-10">Established 1929 &middot; Pengilly, Minnesota</p>
-        <div className="prose prose-lg max-w-none text-gray-700">
+        <h1 className="section-title animate-fade-in-up stagger-1">About Swan Lake</h1>
+        <p className="text-gray-500 mb-10 animate-fade-in-up stagger-1">Established 1929 &middot; Pengilly, Minnesota</p>
+        <div className="prose prose-lg max-w-none text-gray-700 animate-fade-in-up stagger-2">
           <p>
             Swan Lake Country Club was established in 1929. It is an incorporated golf course,
             serving the public as well as its membership. Swan Lake Country Club&apos;s bucolic setting
@@ -22,8 +22,8 @@ export default function AboutPage() {
       {/* Leadership */}
       <section className="bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="section-title text-center mb-8">Personnel</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          <h2 className="section-title text-center mb-8 animate-fade-in-up stagger-3">Personnel</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 animate-fade-in-up stagger-3">
             <div className="card text-center">
               <h3 className="font-bold text-lg text-swan-green">Club Manager</h3>
               <p className="text-xl mt-2">Laurie Chellico</p>
@@ -43,7 +43,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card animate-fade-in-up stagger-4">
             <h3 className="text-xl font-bold text-swan-green mb-4 text-center">Board of Directors</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -100,7 +100,7 @@ export default function AboutPage() {
       </section>
 
       {/* Contact */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 animate-fade-in-up stagger-5">
         <h2 className="section-title text-center mb-8">Contact Info</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <a href="tel:+12188853543" className="card text-center hover:shadow-lg transition-shadow">

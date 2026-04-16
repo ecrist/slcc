@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { SkeletonTable } from "@/components/Skeleton";
 import type { Membership } from "@/lib/types";
 import { MEMBERSHIP_TYPES, MembershipType } from "@/lib/types";
 
@@ -196,7 +197,7 @@ export default function AdminMemberships() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <SkeletonTable rows={8} cols={5} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-gray-500">No memberships found.</div>
       ) : (

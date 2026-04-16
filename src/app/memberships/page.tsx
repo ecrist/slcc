@@ -142,10 +142,10 @@ export default function MembershipsPage() {
   return (
     <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="section-title">Annual Memberships</h1>
-      <p className="text-gray-600 mb-10 max-w-2xl">
+      <h1 className="section-title animate-fade-in-up">Annual Memberships</h1>
+      <p className="text-gray-600 mb-10 max-w-2xl animate-fade-in-up">
         Join Swan Lake Country Club and enjoy unlimited golf all season long.
-        All memberships run from May 1 through October 31, 2026.
+        All memberships run from May 1 through October 31, {new Date().getFullYear()}.
       </p>
 
       {result && (
@@ -156,24 +156,31 @@ export default function MembershipsPage() {
 
       {/* Membership Tiers */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-        {displayTypes.map(([key, tier]) => (
+        {displayTypes.map(([key, tier], index) => (
           <button
             key={key}
             onClick={() => setSelectedType(key)}
-            className="card text-left transition-all hover:shadow-lg"
+            className="card text-left transition-all hover:shadow-xl hover:scale-[1.02] hover:border-swan-green/40 group animate-fade-in-up"
+            style={{ animationDelay: `${index * 0.05}s` }}
           >
             <h3 className="text-xl font-bold text-swan-green mb-1">{tier.name}</h3>
             <p className="text-3xl font-bold text-swan-dark mb-2">
               ${tier.price}
               <span className="text-sm font-normal text-gray-500">/season</span>
             </p>
-            <p className="text-gray-600 text-sm">{tier.description}</p>
+            <p className="text-gray-600 text-sm mb-4">{tier.description}</p>
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-swan-green group-hover:gap-2.5 transition-all">
+              Sign Up
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </span>
           </button>
         ))}
       </div>
 
     </div>
-    <section className="bg-gray-50">
+    <section className="bg-gray-50 animate-fade-in-up">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <h2 className="section-title text-center mb-8">Member Information</h2>
         {/* Member Days & Times */}
@@ -245,7 +252,7 @@ export default function MembershipsPage() {
                 <h2 className="text-xl font-bold text-swan-green">
                   {MEMBERSHIP_TYPES[selectedType].name}
                 </h2>
-                <p className="text-gray-500 text-sm">2026 Season</p>
+                <p className="text-gray-500 text-sm">{new Date().getFullYear()} Season</p>
               </div>
               <button
                 onClick={() => { setSelectedType(null); setAddRange(false); }}

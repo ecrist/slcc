@@ -77,8 +77,8 @@ export default function EventsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="section-title">Events Calendar</h1>
-      <p className="text-gray-600 mb-8">Tournaments, leagues, clinics, and social gatherings at Swan Lake.</p>
+      <h1 className="section-title animate-fade-in-up">Events Calendar</h1>
+      <p className="text-gray-600 mb-8 animate-fade-in-up">Tournaments, leagues, clinics, and social gatherings at Swan Lake.</p>
 
       {regResult && (
         <div className={`mb-6 p-4 rounded-lg ${regResult.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
@@ -87,7 +87,7 @@ export default function EventsPage() {
       )}
 
       {/* Filter */}
-      <div className="flex gap-2 mb-8 flex-wrap">
+      <div className="flex gap-2 mb-8 flex-wrap animate-fade-in-up stagger-1">
         {[{ key: "all", label: "All Events" }, ...Object.entries(EVENT_TYPE_LABELS).map(([key, v]) => ({ key, label: v.label + "s" }))].map((f) => (
           <button
             key={f.key}
@@ -107,12 +107,12 @@ export default function EventsPage() {
         <div className="text-center py-12 text-gray-500">No upcoming events found.</div>
       ) : (
         <div className="space-y-6">
-          {filteredEvents.map((event) => {
+          {filteredEvents.map((event, index) => {
             const typeInfo = EVENT_TYPE_LABELS[event.event_type] || EVENT_TYPE_LABELS.general;
             const spotsLeft = event.max_participants ? event.max_participants - event.current_participants : null;
 
             return (
-              <div key={event.id} className="card flex flex-col md:flex-row gap-6">
+              <div key={event.id} className="card flex flex-col md:flex-row gap-6 animate-fade-in-up" style={{ animationDelay: `${index * 0.05}s` }}>
                 {/* Date badge */}
                 <div className="flex-shrink-0 text-center md:w-24">
                   <div className="bg-swan-green text-white rounded-lg p-3">
