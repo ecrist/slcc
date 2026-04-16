@@ -302,27 +302,19 @@ export default function TeeTimesPage() {
       lines.push({ label: `Green fee (${is9 ? "9" : "18"} holes) × ${members.length} member${members.length > 1 ? "s" : ""}`, amount: 0 });
     }
 
-    // Cart pricing — pair riders, use half/full cart rates by member status
+    // Cart pricing — pair riders 2-per-cart, each pays half the full cart rate
+    // Solo rider also pays the half rate (not the full cart rate)
     const riders = playerEntries.filter((p) => p.ridingCart);
     const cartPairs: PlayerEntry[][] = [];
     for (let i = 0; i < riders.length; i += 2) {
       cartPairs.push(i + 1 < riders.length ? [riders[i], riders[i + 1]] : [riders[i]]);
     }
     for (const pair of cartPairs) {
-      if (pair.length === 2) {
-        // Shared cart — each rider pays half cart rate
-        for (const p of pair) {
-          const rate = p.isMember
-            ? (is9 ? rates.cartMemberHalf9 : rates.cartMemberHalf18)
-            : (is9 ? rates.cartNonmemberHalf9 : rates.cartNonmemberHalf18);
-          lines.push({ label: `Half cart – ${p.isMember ? "member" : "non-member"} (${p.name || "player"})`, amount: rate });
-        }
-      } else {
-        const p = pair[0];
+      for (const p of pair) {
         const rate = p.isMember
-          ? (is9 ? rates.cartMemberFull9 : rates.cartMemberFull18)
-          : (is9 ? rates.cartNonmemberFull9 : rates.cartNonmemberFull18);
-        lines.push({ label: `Full cart – ${p.isMember ? "member" : "non-member"} (${p.name || "player"})`, amount: rate });
+          ? (is9 ? rates.cartMemberHalf9 : rates.cartMemberHalf18)
+          : (is9 ? rates.cartNonmemberHalf9 : rates.cartNonmemberHalf18);
+        lines.push({ label: `Riding cart – ${p.isMember ? "member" : "non-member"} (${p.name || "player"})`, amount: rate });
       }
     }
 
