@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
     latStr, lngStr,
     bookingDaysAhead,
     autoCloseDate,
+    requireLoginForBookingRaw,
   ] = await Promise.all([
     getConfigValue("tee_time_open"),
     getConfigValue("tee_time_close"),
@@ -133,7 +134,9 @@ export async function GET(request: NextRequest) {
     getConfigValue("course_longitude"),
     getConfigValue("booking_days_ahead"),
     getConfigValue("course_auto_close_date"),
+    getConfigValue("require_login_for_booking"),
   ]);
+  const requireLoginForBooking = requireLoginForBookingRaw === "true";
 
   // Compute effective last tee time
   // When tee_time_close is blank, automatically use sunset-based cutoff
@@ -202,6 +205,7 @@ export async function GET(request: NextRequest) {
     bookingDaysAhead: parseInt(bookingDaysAhead ?? "8") || 8,
     autoCloseDate: autoCloseDate ?? null,
     userIsMember,
+    requireLoginForBooking,
   });
 }
 
@@ -214,6 +218,18 @@ export async function POST(request: NextRequest) {
 
   if (!date || !time || !player_name) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  // Enforce sign-in requirement if admin has enabled it
+  const requireLoginForBooking = (await getConfigValue("require_login_for_booking")) === "true";
+  if (requireLoginForBooking) {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Please sign in to book a tee time." },
+        { status: 401 }
+      );
+    }
   }
 
   // Check course_open and apply auto-open/close date logic

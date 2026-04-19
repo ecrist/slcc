@@ -86,6 +86,7 @@ All editable via Admin → Settings. No rebuild needed.
 | `booking_days_ahead` | `8` | How far ahead guests can book |
 | `course_auto_open_date` | (blank) | YYYY-MM-DD — auto-set `course_open=true` on this date |
 | `course_auto_close_date` | (blank) | YYYY-MM-DD — auto-set `course_open=false` on this date |
+| `require_login_for_booking` | `false` | When `true`, visitors must be signed in to book a tee time (enforced client + server) |
 | `green_fee_9_holes` | `25` | Used in booking pricing for non-members |
 | `green_fee_18_holes` | `35` | Used in booking pricing for non-members |
 | `cart_storage_fee` | `250` | Per season, used in billing |
@@ -147,7 +148,8 @@ All managed in Admin → Settings → Cart, Equipment & Range Rates. Used for bo
 - 12-minute slots, filtered by `tee_time_open`/`tee_time_close` (blank close = sunset-based)
 - Party sizes 1–12; 5–8 players = 2 slots, 9–12 = 3 consecutive slots
 - Concurrency: `BEGIN IMMEDIATE` transaction + unique partial index
-- Guest booking allowed (no login required)
+- Guest booking allowed by default; admin toggle (`require_login_for_booking`) can gate all bookings behind sign-in
+- When login is required, clicking a time slot stashes `{date, slot}` in `sessionStorage` and redirects to `/login?callbackUrl=/tee-times`; on return the modal re-opens on the original slot and date
 - Confirmation email sent if email provided
 - Course open/closed toggle with optional auto-open/close dates
 - Configurable booking window (`booking_days_ahead`, default 8 days)
@@ -155,21 +157,25 @@ All managed in Admin → Settings → Cart, Equipment & Range Rates. Used for bo
 
 **Booking modal:**
 - Opens on time slot selection (no layout shift)
-- Per-player entry: name, member checkbox, equipment checkboxes (Riding Cart, Pull Cart, Club Rental, Personal Cart Drop)
+- Fixed height with only the player list scrolling; hero header shows date overline + centered time (with prev/next chevrons that jump to the nearest available start for the current party size), player stepper, and 9/18-hole toggle
+- Inline party-size stepper with predictive validation: the `+` button is disabled when the next slot isn't available for the current start
+- Per-player entry: name, Member/Guest toggle, mutually-exclusive cart choice (Golf Cart / Pull Cart / Cart Drop), independent Club Rental
+- Every player requires a name; submitting with any blank triggers a soft error state (Confirm button turns gold, label changes to "Add player name to continue" / "Add player names to continue", and missing inputs get an amber border). The banner/border do not appear until the user first tries to submit
+- Player #1's name is pre-filled from the signed-in session; Member toggle is auto-checked and locked only when the session email matches an active membership
 - Email and phone collected for player #1 only (the person making the booking)
-- Logged-in members: player #1's member checkbox auto-checked and locked based on active membership lookup
 - Cart pairing: riders paired 2-per-cart; shared riders pay half cart rate, solo riders pay full cart rate; rates vary by member/non-member and 9/18 holes
-- Pricing summary always visible: green fees (included for members, charged for non-members), cart fees, pull cart, club rental, personal cart drop
+- Per-player pricing breakdown in the footer: each player's green fee (Included for members), attributed cart cost, pull cart, club rental, cart drop fee — summed into an estimated total
 - All pricing pulled from Cart, Equipment & Range Rates settings section
 - Body scroll locked while modal is open
 
 **Availability enforcement (all server-side + reflected in UI):**
 1. `course_open` = false → all bookings blocked, entire booking UI hidden
 2. `course_auto_close_date` — dates on or after show "Online bookings are not available"
-3. `tee_time_open` / `tee_time_close` window
-4. Sunset cutoff — astronomical calculation (`src/lib/sunset.ts`, NOAA algorithm, no API key); when `tee_time_close` is blank, sunset minus `sunset_cutoff_hours` is the cutoff
-5. Private events — `is_public=0` events block their time window (whole day if no start/end)
-6. Equipment availability — capped by inventory minus same-day bookings
+3. `require_login_for_booking` = true → POST returns 401 if no session; client redirects slot clicks to `/login` and restores modal on return
+4. `tee_time_open` / `tee_time_close` window
+5. Sunset cutoff — astronomical calculation (`src/lib/sunset.ts`, NOAA algorithm, no API key); when `tee_time_close` is blank, sunset minus `sunset_cutoff_hours` is the cutoff
+6. Private events — `is_public=0` events block their time window (whole day if no start/end)
+7. Equipment availability — capped by inventory minus same-day bookings
 
 **UI slot colors:** available (white), selected start (gold), also-reserved (amber), booked (gray/strikethrough), private event (purple)
 

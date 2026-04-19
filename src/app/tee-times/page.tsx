@@ -69,6 +69,31 @@ function localDateStr(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Module-scoped cache so React StrictMode's double-invoked effects don't
+// consume the sessionStorage value on the first run and then overwrite
+// state with "today" on the second run.
+type PendingBooking = { date?: string; slot?: string };
+let pendingBookingCache: PendingBooking | null | undefined = undefined;
+
+function readPendingBookingOnce(): PendingBooking | null {
+  if (pendingBookingCache !== undefined) return pendingBookingCache;
+  if (typeof window === "undefined") {
+    pendingBookingCache = null;
+    return null;
+  }
+  try {
+    const raw = sessionStorage.getItem("pendingBooking");
+    if (raw) {
+      const parsed = JSON.parse(raw) as PendingBooking;
+      sessionStorage.removeItem("pendingBooking");
+      pendingBookingCache = parsed;
+      return parsed;
+    }
+  } catch { /* ignore */ }
+  pendingBookingCache = null;
+  return null;
+}
+
 export default function TeeTimesPage() {
   const { data: session } = useSession();
   const [selectedDate, setSelectedDate] = useState("");
@@ -94,6 +119,10 @@ export default function TeeTimesPage() {
   const [bookingDaysAhead, setBookingDaysAhead] = useState(8);
   const [autoCloseDate, setAutoCloseDate] = useState<string | null>(null);
   const [userIsMember, setUserIsMember] = useState(false);
+  const [requireLoginForBooking, setRequireLoginForBooking] = useState(false);
+  const [pendingSlot, setPendingSlot] = useState<string | null>(null);
+  // Only surface missing-name warnings after the user tries to submit.
+  const [showNameErrors, setShowNameErrors] = useState(false);
   const [bookingConfirmation, setBookingConfirmation] = useState<{
     time: string; date: string; players: number; holes: string; name: string; email: string; groupId: string;
   } | null>(null);
@@ -107,9 +136,18 @@ export default function TeeTimesPage() {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
+      // Reset missing-name warnings when the modal closes
+      setShowNameErrors(false);
     }
     return () => { document.body.style.overflow = ""; };
   }, [bookingSlot]);
+
+  // Once the user fills in the missing names, dismiss the warning state.
+  useEffect(() => {
+    if (showNameErrors && playerEntries.every((p) => p.name.trim())) {
+      setShowNameErrors(false);
+    }
+  }, [showNameErrors, playerEntries]);
 
   // Resize player entries when party size or slot changes
   useEffect(() => {
@@ -117,26 +155,61 @@ export default function TeeTimesPage() {
       const arr = [...prev];
       while (arr.length < players) arr.push({ name: "", isMember: false, ridingCart: false, pullCart: false, clubRental: false, personalCartDrop: false });
       const sliced = arr.slice(0, players);
-      // Auto-set player #1's member status if logged-in user is a member
+      // If the signed-in user is a verified member, force player #1 to Member
+      // so they can't accidentally/fraudulently book as Guest. If they're not a
+      // verified member, leave the toggle free — they may still self-identify.
       if (sliced.length > 0 && userIsMember) {
         sliced[0] = { ...sliced[0], isMember: true };
       }
+      // Pre-fill player #1's name from the session so the missing-name
+      // validator matches what the user actually sees in the input.
+      const sessionName = session?.user?.name?.trim();
+      if (sliced.length > 0 && !sliced[0].name.trim() && sessionName) {
+        sliced[0] = { ...sliced[0], name: sessionName };
+      }
       return sliced;
     });
-  }, [players, bookingSlot, userIsMember]);
+  }, [players, bookingSlot, userIsMember, session?.user?.name]);
 
+  // Note: we intentionally do NOT auto-close the modal when party size grows
+  // past the current slot group — instead the modal shows a warning so the
+  // user can either reduce the party or close and pick another time.
+
+  // Set initial date on mount (client-only to avoid hydration mismatch).
+  // If the user was bounced to /login by the sign-in gate, we stashed
+  // { date, slot } in sessionStorage — restore it here so we re-open the
+  // booking modal on the exact tee time they originally clicked. We also
+  // accept ?date= / ?slot= query params as a fallback (shareable links).
   useEffect(() => {
-    if (bookingSlot) {
-      const group = getSlotGroup(bookingSlot, slotsNeeded);
-      const valid = group.length === slotsNeeded && group.every((t) => !bookedTimes.has(t));
-      if (!valid) setBookingSlot(null);
+    let initialDate = localDateStr();
+    let initialSlot: string | null = null;
+
+    // 1) sessionStorage (set by the slot-click handler before /login redirect).
+    //    Cached at module scope so StrictMode's double-invoked effect doesn't
+    //    eat the value on the first run and lose it on the second.
+    const pending = readPendingBookingOnce();
+    if (pending) {
+      if (pending.date && /^\d{4}-\d{2}-\d{2}$/.test(pending.date)) initialDate = pending.date;
+      if (pending.slot && /^\d{2}:\d{2}$/.test(pending.slot)) initialSlot = pending.slot;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slotsNeeded, players]);
 
-  // Set initial date on mount (client-only to avoid hydration mismatch)
-  useEffect(() => {
-    setSelectedDate(localDateStr());
+    // 2) URL param fallback (shareable links)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const d = params.get("date");
+      const s = params.get("slot");
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) initialDate = d;
+      if (s && /^\d{2}:\d{2}$/.test(s)) initialSlot = s;
+      if (d || s) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("date");
+        url.searchParams.delete("slot");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+
+    setSelectedDate(initialDate);
+    if (initialSlot) setPendingSlot(initialSlot);
   }, []);
 
   useEffect(() => {
@@ -144,6 +217,27 @@ export default function TeeTimesPage() {
     fetchData();
     setBookingSlot(null);
   }, [selectedDate]);
+
+  // After data loads, if we have a pending slot (e.g. user just returned from
+  // /login), open the booking modal on it — but only if the slot is still
+  // available and the login gate is satisfied.
+  useEffect(() => {
+    if (loading) return;
+    if (!pendingSlot) return;
+    if (requireLoginForBooking && !session) return; // still gated
+    const privateBlock = privateEvents.some((evt) => {
+      const start = evt.start_time, end = evt.end_time;
+      if (!start && !end) return true;
+      if (!start) return pendingSlot <= end!;
+      if (!end) return pendingSlot >= start;
+      return pendingSlot >= start && pendingSlot <= end;
+    });
+    const isBooked = bookedSlots.some((s) => s.time === pendingSlot);
+    if (!isBooked && !privateBlock) {
+      setBookingSlot(pendingSlot);
+    }
+    setPendingSlot(null);
+  }, [loading, pendingSlot, session, requireLoginForBooking, bookedSlots, privateEvents]);
 
   async function fetchData() {
     setLoading(true);
@@ -163,6 +257,7 @@ export default function TeeTimesPage() {
       setAutoCloseDate(data.autoCloseDate ?? null);
       if (data.rates) setRates(data.rates);
       setUserIsMember(data.userIsMember === true);
+      setRequireLoginForBooking(data.requireLoginForBooking === true);
     } catch {
       console.error("Failed to fetch tee times");
     } finally {
@@ -173,6 +268,11 @@ export default function TeeTimesPage() {
   async function handleBook(e: React.FormEvent) {
     e.preventDefault();
     if (!bookingSlot) return;
+    // Require a name for every player
+    if (playerEntries.some((p) => !p.name.trim())) {
+      setShowNameErrors(true);
+      return;
+    }
     setSubmitting(true);
     setSubmitStatus(null);
 
@@ -292,71 +392,130 @@ export default function TeeTimesPage() {
 
   const selectedGroup = bookingSlot ? getSlotGroup(bookingSlot, slotsNeeded) : [];
 
+  // Validate whether an arbitrary party size would fit when starting from
+  // the given slot — used both for the current selection and for predicting
+  // whether the +/- stepper is allowed to add another player.
+  function validateGroup(
+    startTime: string,
+    partySize: number,
+  ): { valid: boolean; reason?: string; conflictTime?: string } {
+    const count = slotsNeededForPlayers(partySize);
+    const group = getSlotGroup(startTime, count);
+    if (group.length < count) {
+      return { valid: false, reason: "Not enough remaining tee slots later in the day." };
+    }
+    for (const t of group) {
+      if (t === startTime) continue; // the selected start is always OK
+      if (bookedTimes.has(t)) {
+        return { valid: false, reason: `The next slot at ${formatTime(t)} is already booked.`, conflictTime: t };
+      }
+      const pb = privateEventBlockingSlot(t);
+      if (pb) {
+        return { valid: false, reason: `The next slot at ${formatTime(t)} is blocked by ${pb}.`, conflictTime: t };
+      }
+      if (teeTimeClose && t > teeTimeClose) {
+        return { valid: false, reason: `The next slot at ${formatTime(t)} is past the tee time window.`, conflictTime: t };
+      }
+    }
+    return { valid: true };
+  }
+
+  const groupValidity = bookingSlot ? validateGroup(bookingSlot, players) : null;
+  const canAddPlayer = !!bookingSlot && players < 12 && validateGroup(bookingSlot, players + 1).valid;
+  const addPlayerBlockedReason = !!bookingSlot && players < 12 && !canAddPlayer
+    ? validateGroup(bookingSlot, players + 1).reason
+    : undefined;
+
+  // Which 1-based player positions are missing a name (used for banner + submit guard)
+  const missingNamePositions = playerEntries
+    .map((p, i) => (p.name.trim() ? null : i + 1))
+    .filter((n): n is number => n !== null);
+  const hasMissingNames = missingNamePositions.length > 0;
+
+  // Walk visibleSlots from the current booking slot in the given direction
+  // and return the first slot that fits the current party size and isn't
+  // itself booked / privately blocked.
+  function findNearestValidSlot(direction: 1 | -1): string | null {
+    if (!bookingSlot) return null;
+    const currentIdx = visibleSlots.indexOf(bookingSlot);
+    if (currentIdx === -1) return null;
+    for (let i = currentIdx + direction; i >= 0 && i < visibleSlots.length; i += direction) {
+      const candidate = visibleSlots[i];
+      if (bookedTimes.has(candidate)) continue;
+      if (privateEventBlockingSlot(candidate)) continue;
+      if (validateGroup(candidate, players).valid) return candidate;
+    }
+    return null;
+  }
+  const prevAvailableSlot = findNearestValidSlot(-1);
+  const nextAvailableSlot = findNearestValidSlot(1);
+
   function calculatePricing() {
     if (!rates) return null;
     const is9 = bookingHoles === "9";
-    const lines: { label: string; amount: number }[] = [];
-
-    // Green fees — members included, non-members pay
     const greenFeeRate = is9 ? rates.greenFee9 : rates.greenFee18;
-    const nonMembers = playerEntries.filter((p) => !p.isMember);
-    const members = playerEntries.filter((p) => p.isMember);
-    if (nonMembers.length > 0) {
-      lines.push({ label: `Green fee (${is9 ? "9" : "18"} holes) × ${nonMembers.length}`, amount: nonMembers.length * greenFeeRate });
-    }
-    if (members.length > 0) {
-      lines.push({ label: `Green fee (${is9 ? "9" : "18"} holes) × ${members.length} member${members.length > 1 ? "s" : ""}`, amount: 0 });
-    }
 
-    // Cart pricing — pair riders 2-per-cart
-    // Solo rider: pays "half cart" rate (the solo/single rider price)
-    // Shared cart: each rider pays half of the "full cart" rate for their member status
-    const riders = playerEntries.filter((p) => p.ridingCart);
-    const cartPairs: PlayerEntry[][] = [];
-    for (let i = 0; i < riders.length; i += 2) {
-      cartPairs.push(i + 1 < riders.length ? [riders[i], riders[i + 1]] : [riders[i]]);
-    }
-    for (const pair of cartPairs) {
-      if (pair.length === 2) {
-        // Sharing a cart — each pays half the full cart rate for their member status
-        for (const p of pair) {
+    type PlayerLine = { label: string; amount: number; included?: boolean };
+    type PlayerBill = { name: string; isMember: boolean; lines: PlayerLine[]; subtotal: number };
+
+    // Pair riders by their index so cart costs can be attributed per-player.
+    // Solo rider in a pair -> "half cart" (single rider) rate.
+    // Two riders sharing -> each pays their own full-cart rate / 2.
+    const riderIndices = playerEntries
+      .map((p, idx) => ({ p, idx }))
+      .filter(({ p }) => p.ridingCart)
+      .map(({ idx }) => idx);
+
+    const cartByPlayer = new Map<number, PlayerLine>();
+    for (let k = 0; k < riderIndices.length; k += 2) {
+      const aIdx = riderIndices[k];
+      const bIdx = riderIndices[k + 1];
+      if (bIdx !== undefined) {
+        for (const idx of [aIdx, bIdx]) {
+          const p = playerEntries[idx];
           const fullRate = p.isMember
             ? (is9 ? rates.cartMemberFull9 : rates.cartMemberFull18)
             : (is9 ? rates.cartNonmemberFull9 : rates.cartNonmemberFull18);
-          const splitRate = fullRate / 2;
-          lines.push({ label: `Shared cart – ${p.isMember ? "member" : "non-member"} (${p.name || "player"})`, amount: splitRate });
+          cartByPlayer.set(idx, { label: `Shared cart (${is9 ? "9" : "18"} holes)`, amount: fullRate / 2 });
         }
       } else {
-        // Solo rider — pays the half cart (single rider) rate
-        const p = pair[0];
+        const p = playerEntries[aIdx];
         const rate = p.isMember
           ? (is9 ? rates.cartMemberHalf9 : rates.cartMemberHalf18)
           : (is9 ? rates.cartNonmemberHalf9 : rates.cartNonmemberHalf18);
-        lines.push({ label: `Riding cart – ${p.isMember ? "member" : "non-member"} (${p.name || "player"})`, amount: rate });
+        cartByPlayer.set(aIdx, { label: `Solo cart (${is9 ? "9" : "18"} holes)`, amount: rate });
       }
     }
 
-    // Pull carts
-    const pullCount = playerEntries.filter((p) => p.pullCart).length;
-    if (pullCount > 0) {
-      lines.push({ label: `Pull cart rental × ${pullCount}`, amount: pullCount * rates.pullCartFee });
-    }
+    const playersBill: PlayerBill[] = playerEntries.map((p, idx) => {
+      const lines: PlayerLine[] = [];
+      // Green fee
+      lines.push(
+        p.isMember
+          ? { label: `Green fee (${is9 ? "9" : "18"} holes)`, amount: 0, included: true }
+          : { label: `Green fee (${is9 ? "9" : "18"} holes)`, amount: greenFeeRate },
+      );
+      if (cartByPlayer.has(idx)) lines.push(cartByPlayer.get(idx)!);
+      if (p.pullCart) lines.push({ label: "Pull cart rental", amount: rates.pullCartFee });
+      if (p.clubRental) {
+        lines.push({
+          label: `Club rental (${is9 ? "9" : "18"} holes)`,
+          amount: is9 ? rates.clubRental9 : rates.clubRental18,
+        });
+      }
+      if (p.personalCartDrop) lines.push({ label: "Personal cart drop", amount: rates.personalCartDropFee });
 
-    // Club rentals
-    const clubCount = playerEntries.filter((p) => p.clubRental).length;
-    if (clubCount > 0) {
-      const clubRate = is9 ? rates.clubRental9 : rates.clubRental18;
-      lines.push({ label: `Club rental (${is9 ? "9" : "18"} holes) × ${clubCount}`, amount: clubCount * clubRate });
-    }
+      const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+      return {
+        name: p.name.trim() || `Player ${idx + 1}`,
+        isMember: p.isMember,
+        lines,
+        subtotal,
+      };
+    });
 
-    // Personal cart drop
-    const dropCount = playerEntries.filter((p) => p.personalCartDrop).length;
-    if (dropCount > 0) {
-      lines.push({ label: `Personal cart drop × ${dropCount}`, amount: dropCount * rates.personalCartDropFee });
-    }
-
-    const total = lines.reduce((s, l) => s + l.amount, 0);
-    return { lines, total };
+    const total = playersBill.reduce((s, p) => s + p.subtotal, 0);
+    return { players: playersBill, total };
   }
 
   const pricing = calculatePricing();
@@ -459,6 +618,7 @@ export default function TeeTimesPage() {
             )}
           </div>
 
+
           {loading ? (
             <SkeletonSlotGrid />
           ) : isBeyondClose || visibleSlots.length === 0 ? (
@@ -507,9 +667,31 @@ export default function TeeTimesPage() {
                   <button
                     key={time}
                     disabled={isUnavailable}
-                    onClick={() => setBookingSlot(isSelectedStart ? null : time)}
+                    onClick={() => {
+                      if (requireLoginForBooking && !session) {
+                        // Stash target date+slot in sessionStorage so it
+                        // survives the OAuth round-trip (URL callback params
+                        // can get mangled through the provider redirect).
+                        try {
+                          sessionStorage.setItem(
+                            "pendingBooking",
+                            JSON.stringify({ date: selectedDate, slot: time }),
+                          );
+                        } catch { /* ignore storage errors */ }
+                        const next = encodeURIComponent("/tee-times");
+                        window.location.href = `/login?callbackUrl=${next}`;
+                        return;
+                      }
+                      setBookingSlot(isSelectedStart ? null : time);
+                    }}
                     className={className}
-                    title={privateBlock ? `Unavailable: ${privateBlock}` : undefined}
+                    title={
+                      privateBlock
+                        ? `Unavailable: ${privateBlock}`
+                        : requireLoginForBooking && !session
+                        ? "Sign in required to book"
+                        : undefined
+                    }
                   >
                     {formatTime(time)}
                     {privateBlock && <span className="block text-xs mt-0.5">Private Event</span>}
@@ -552,160 +734,421 @@ export default function TeeTimesPage() {
       {/* Booking Modal */}
       {bookingSlot && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/40 animate-overlay-in" onClick={() => setBookingSlot(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in">
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-swan-green">
+          <div className="absolute inset-0 bg-black/50 animate-overlay-in" onClick={() => setBookingSlot(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 h-[88vh] max-h-[760px] overflow-hidden flex flex-col animate-modal-in">
+            {/* Hero header — condensed */}
+            <div className="bg-swan-green text-white px-5 pt-3 pb-4 relative">
+              <button
+                onClick={() => setBookingSlot(null)}
+                className="absolute top-3 right-3 text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              {/* Date line (above time) */}
+              <p className="inline-flex items-center gap-1.5 text-swan-gold text-[11px] font-semibold uppercase tracking-wider">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.25}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {formatDateDisplay(selectedDate)}
+              </p>
+              {/* Time + players + holes — centered with even gaps */}
+              <div className="flex items-center justify-center gap-5 mt-2">
+                {/* Time with prev/next arrows */}
+                <div className="inline-flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => prevAvailableSlot && setBookingSlot(prevAvailableSlot)}
+                    disabled={!prevAvailableSlot}
+                    aria-label="Previous available tee time"
+                    title={
+                      prevAvailableSlot
+                        ? `Previous available for ${players} player${players > 1 ? "s" : ""}: ${formatTime(prevAvailableSlot)}`
+                        : `No earlier time fits ${players} player${players > 1 ? "s" : ""}`
+                    }
+                    className="w-7 h-7 shrink-0 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-25 disabled:hover:bg-white/10 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <h2 className="text-xl font-bold leading-none tabular-nums">
                     {slotsNeeded > 1
-                      ? `${formatTime(selectedGroup[0])} – ${formatTime(selectedGroup[selectedGroup.length - 1])}`
-                      : `Book ${formatTime(bookingSlot)}`}
+                      ? `${formatTime(selectedGroup[0])}–${formatTime(selectedGroup[selectedGroup.length - 1])}`
+                      : formatTime(bookingSlot)}
                   </h2>
-                  <p className="text-gray-500 text-sm">{formatDateDisplay(selectedDate)} · {players} player{players > 1 ? "s" : ""}</p>
-                  {slotsNeeded > 1 && (
-                    <p className="text-amber-700 text-xs mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
-                      {slotsNeeded} consecutive slots reserved
-                    </p>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => nextAvailableSlot && setBookingSlot(nextAvailableSlot)}
+                    disabled={!nextAvailableSlot}
+                    aria-label="Next available tee time"
+                    title={
+                      nextAvailableSlot
+                        ? `Next available for ${players} player${players > 1 ? "s" : ""}: ${formatTime(nextAvailableSlot)}`
+                        : `No later time fits ${players} player${players > 1 ? "s" : ""}`
+                    }
+                    className="w-7 h-7 shrink-0 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-25 disabled:hover:bg-white/10 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
-                <button onClick={() => setBookingSlot(null)} className="text-gray-400 hover:text-gray-600 p-1">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                {/* Player stepper */}
+                <div className="inline-flex items-center gap-1.5">
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                   </svg>
-                </button>
+                  <div className="inline-flex items-center justify-between bg-white/10 rounded-full border border-white/20 p-0.5 h-7 w-[82px]">
+                    <button
+                      type="button"
+                      onClick={() => setPlayers(Math.max(1, players - 1))}
+                      disabled={players <= 1}
+                      aria-label="Remove a player"
+                      className="w-6 h-6 rounded-full hover:bg-white/25 disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center transition-colors shrink-0"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" d="M5 12h14" />
+                      </svg>
+                    </button>
+                    <span className="tabular-nums text-sm font-semibold text-center flex-1">{players}</span>
+                    <button
+                      type="button"
+                      onClick={() => { if (canAddPlayer) setPlayers(players + 1); }}
+                      disabled={!canAddPlayer}
+                      aria-label="Add a player"
+                      title={
+                        players >= 12
+                          ? "Maximum 12 players"
+                          : !canAddPlayer
+                          ? `Can't add another player — ${addPlayerBlockedReason ?? "next tee slot isn't available."} Pick a different start time to fit a larger party.`
+                          : "Add a player"
+                      }
+                      className="w-6 h-6 rounded-full hover:bg-white/25 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                {/* Holes toggle */}
+                <div className="inline-flex items-center gap-1.5">
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V3m0 0h11l-3 3 3 3H5M3 21h8" />
+                  </svg>
+                  <div
+                    role="radiogroup"
+                    aria-label="Round length"
+                    className="inline-flex items-center bg-white/10 rounded-full border border-white/20 p-0.5 h-7 w-[82px]"
+                  >
+                    {["9", "18"].map((h) => (
+                      <button
+                        key={h}
+                        type="button"
+                        role="radio"
+                        aria-checked={bookingHoles === h}
+                        onClick={() => setBookingHoles(h)}
+                        className={`flex-1 h-6 rounded-full text-xs font-semibold transition-colors flex items-center justify-center ${
+                          bookingHoles === h
+                            ? "bg-white text-swan-green shadow-sm"
+                            : "text-white/80 hover:text-white"
+                        }`}
+                      >
+                        {h}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-
-              {!session && (
-                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4">
-                  <a href="/login" className="text-swan-green font-medium hover:underline">Sign in</a>
-                  {" "}to pre-fill your details, or continue as a guest below.
+              {slotsNeeded > 1 && groupValidity?.valid && (
+                <p className="text-xs mt-2 bg-white/10 border border-white/20 rounded-md px-2 py-1 inline-block">
+                  {slotsNeeded} consecutive slots reserved
                 </p>
               )}
+              {bookingSlot && !canAddPlayer && players < 12 && (
+                <p className="text-[11px] mt-2 text-white/75 leading-snug">
+                  Max {players} for this tee time — {addPlayerBlockedReason?.toLowerCase() ?? "next slot isn't available."} Pick a different start time for a larger party.
+                </p>
+              )}
+            </div>
 
-              <form onSubmit={handleBook} className="space-y-4">
-                {/* Holes */}
+            {/* Fixed banners (above scroll area) */}
+            {(groupValidity && !groupValidity.valid) || !session ? (
+              <div className="px-6 pt-4 shrink-0 space-y-2">
+                {groupValidity && !groupValidity.valid && (
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800 flex items-start gap-2">
+                    <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94L2.697 17.117A1.875 1.875 0 004.317 20h15.366a1.875 1.875 0 001.62-2.883L13.66 3.94a1.875 1.875 0 00-3.32 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold mb-0.5">Can't fit {players} player{players > 1 ? "s" : ""} in this tee time</p>
+                      <p className="text-xs leading-relaxed">
+                        A party of {players} needs {slotsNeeded} consecutive slots. {groupValidity.reason} Reduce your party size or close this and pick a different start time.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {!session && (
+                  <p className="text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <a href="/login" className="text-swan-green font-semibold hover:underline">Sign in</a>
+                    {" "}to pre-fill your details, or continue as a guest below.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {/* Thin divider between hero and scrolling players */}
+            <div className="px-6 pt-3 pb-2 shrink-0 flex items-center justify-between border-b border-gray-100">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                Players
+              </p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                {playerEntries.length} total
+              </p>
+            </div>
+
+            {/* Scrollable players area — ONLY this scrolls */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+              <form id="booking-form" noValidate onSubmit={handleBook}>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Holes</label>
-                  <select className="input-field w-40" value={bookingHoles}
-                    onChange={(e) => setBookingHoles(e.target.value)}>
-                    <option value="9">9 Holes</option>
-                    <option value="18">18 Holes</option>
-                  </select>
-                </div>
+                  <div className="space-y-2">
+                    {playerEntries.map((p, i) => {
+                      const isFirst = i === 0;
+                      // Only lock player #1's toggle when we've positively verified
+                      // them as a member (prevents unlocking the member rate).
+                      // Logged-in non-members can still toggle (e.g. if their
+                      // membership email differs from their login email).
+                      const memberLocked = isFirst && userIsMember;
+                      const updatePlayer = (patch: Partial<PlayerEntry>) => {
+                        if (memberLocked && "isMember" in patch) return;
+                        setPlayerEntries((prev) => prev.map((pe, idx) => idx === i ? { ...pe, ...patch } : pe));
+                      };
 
-                {/* Per-player entries */}
-                <div className="border-t border-gray-100 pt-4 space-y-4">
-                  {playerEntries.map((p, i) => {
-                    const isFirst = i === 0;
-                    const memberLocked = isFirst && userIsMember;
-                    const updatePlayer = (patch: Partial<PlayerEntry>) => {
-                      // Don't allow unlocking member status for logged-in member on player #1
-                      if (memberLocked && "isMember" in patch) return;
-                      setPlayerEntries((prev) => prev.map((pe, idx) => idx === i ? { ...pe, ...patch } : pe));
-                    };
-                    return (
-                      <div key={i} className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-gray-400 w-5 shrink-0">#{i + 1}</span>
-                          <input
-                            type="text"
-                            required
-                            placeholder={isFirst ? (session?.user?.name ?? "Your name") : "Player name"}
-                            className="input-field flex-1 text-sm"
-                            value={p.name !== "" ? p.name : (isFirst ? (session?.user?.name ?? "") : "")}
-                            onChange={(e) => updatePlayer({ name: e.target.value })}
-                          />
-                          <label className={`flex items-center gap-1.5 shrink-0 ${memberLocked ? "opacity-60" : "cursor-pointer"}`}>
-                            <input
-                              type="checkbox"
-                              checked={p.isMember}
-                              disabled={memberLocked}
-                              onChange={(e) => updatePlayer({ isMember: e.target.checked })}
-                              className="w-3.5 h-3.5 text-swan-green rounded"
-                            />
-                            <span className="text-xs text-gray-600">Member</span>
-                          </label>
-                        </div>
-                        {/* Email & phone for player #1 only */}
-                        {isFirst && (
-                          <div className="ml-8 grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">Email *</label>
+                      const EquipChip = ({
+                        label, full, active, onToggle,
+                      }: { label: string; full: string; active: boolean; onToggle: () => void }) => (
+                        <button
+                          type="button"
+                          onClick={onToggle}
+                          aria-pressed={active}
+                          aria-label={full}
+                          title={full}
+                          className={`px-2 py-1 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
+                            active
+                              ? "bg-swan-green text-white border-swan-green shadow-sm"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-swan-green hover:text-swan-green"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+
+                      return (
+                        <div key={i} className="rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-colors">
+                          <div className="px-3 py-2.5 space-y-2">
+                            {/* Header row: avatar + name + member badge */}
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-full bg-swan-green/10 text-swan-green font-bold text-xs flex items-center justify-center shrink-0">
+                                {i + 1}
+                              </div>
                               <input
-                                type="email"
+                                type="text"
                                 required
-                                className="input-field text-sm"
-                                value={bookingEmail !== "" ? bookingEmail : (session?.user?.email ?? "")}
-                                onChange={(e) => setBookingEmail(e.target.value)}
+                                aria-invalid={showNameErrors && !p.name.trim() ? true : undefined}
+                                placeholder={isFirst ? (session?.user?.name ?? "Your name") : `Player ${i + 1} name`}
+                                className={`input-field flex-1 text-sm ${
+                                  showNameErrors && !p.name.trim() ? "border-amber-400 focus:border-amber-500 focus:ring-amber-200" : ""
+                                }`}
+                                value={p.name !== "" ? p.name : (isFirst ? (session?.user?.name ?? "") : "")}
+                                onChange={(e) => updatePlayer({ name: e.target.value })}
+                              />
+                              <div
+                                role="radiogroup"
+                                aria-label="Member status"
+                                title={
+                                  memberLocked
+                                    ? (p.isMember
+                                        ? "Verified from your member account"
+                                        : "Your account is not a current member")
+                                    : undefined
+                                }
+                                className={`shrink-0 inline-flex rounded-full border p-0.5 text-xs font-semibold ${
+                                  memberLocked ? "bg-gray-100 border-gray-200 opacity-90" : "bg-gray-50 border-gray-200"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={!p.isMember}
+                                  disabled={memberLocked}
+                                  onClick={() => updatePlayer({ isMember: false })}
+                                  className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                                    !p.isMember
+                                      ? "bg-swan-gold/25 text-swan-dark shadow-sm border border-swan-gold"
+                                      : "text-gray-500 hover:text-gray-700"
+                                  } ${memberLocked ? "cursor-default" : "cursor-pointer"}`}
+                                >
+                                  Guest
+                                </button>
+                                <button
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={p.isMember}
+                                  disabled={memberLocked}
+                                  onClick={() => updatePlayer({ isMember: true })}
+                                  className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                                    p.isMember
+                                      ? "bg-swan-gold/25 text-swan-dark shadow-sm border border-swan-gold"
+                                      : "text-gray-500 hover:text-gray-700"
+                                  } ${memberLocked ? "cursor-default" : "cursor-pointer"}`}
+                                >
+                                  Member
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Email & phone for player #1 only — compact single row */}
+                            {isFirst && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <input
+                                  type="email"
+                                  required
+                                  placeholder="Email *"
+                                  className="input-field text-sm"
+                                  value={bookingEmail !== "" ? bookingEmail : (session?.user?.email ?? "")}
+                                  onChange={(e) => setBookingEmail(e.target.value)}
+                                />
+                                <input
+                                  type="tel"
+                                  placeholder="Phone (optional)"
+                                  className="input-field text-sm"
+                                  value={bookingPhone}
+                                  onChange={(e) => setBookingPhone(e.target.value)}
+                                />
+                              </div>
+                            )}
+
+                            {/* Equipment chips — 2×2 on mobile, 4 across on desktop.
+                                Golf Cart / Pull Cart / Cart Drop are mutually exclusive
+                                (a player uses only one transport option). Club Rental
+                                is independent. */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                              <EquipChip
+                                label="Golf Cart"
+                                full="Golf Cart (riding)"
+                                active={p.ridingCart}
+                                onToggle={() => updatePlayer(
+                                  p.ridingCart
+                                    ? { ridingCart: false }
+                                    : { ridingCart: true, pullCart: false, personalCartDrop: false },
+                                )}
+                              />
+                              <EquipChip
+                                label="Pull Cart"
+                                full="Pull Cart"
+                                active={p.pullCart}
+                                onToggle={() => updatePlayer(
+                                  p.pullCart
+                                    ? { pullCart: false }
+                                    : { pullCart: true, ridingCart: false, personalCartDrop: false },
+                                )}
+                              />
+                              <EquipChip
+                                label="Cart Drop"
+                                full="Personal Cart Drop"
+                                active={p.personalCartDrop}
+                                onToggle={() => updatePlayer(
+                                  p.personalCartDrop
+                                    ? { personalCartDrop: false }
+                                    : { personalCartDrop: true, ridingCart: false, pullCart: false },
+                                )}
+                              />
+                              <EquipChip
+                                label="Club Rental"
+                                full="Club Rental"
+                                active={p.clubRental}
+                                onToggle={() => updatePlayer({ clubRental: !p.clubRental })}
                               />
                             </div>
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-0.5">Phone</label>
-                              <input type="tel" className="input-field text-sm" value={bookingPhone}
-                                onChange={(e) => setBookingPhone(e.target.value)} />
-                            </div>
                           </div>
-                        )}
-                        <div className="ml-8 flex flex-wrap gap-x-4 gap-y-1">
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={p.ridingCart}
-                              onChange={(e) => updatePlayer({ ridingCart: e.target.checked })}
-                              className="w-3.5 h-3.5 text-swan-green rounded" />
-                            <span className="text-xs text-gray-600">Riding Cart</span>
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={p.pullCart}
-                              onChange={(e) => updatePlayer({ pullCart: e.target.checked })}
-                              className="w-3.5 h-3.5 text-swan-green rounded" />
-                            <span className="text-xs text-gray-600">Pull Cart</span>
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={p.clubRental}
-                              onChange={(e) => updatePlayer({ clubRental: e.target.checked })}
-                              className="w-3.5 h-3.5 text-swan-green rounded" />
-                            <span className="text-xs text-gray-600">Club Rental</span>
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={p.personalCartDrop}
-                              onChange={(e) => updatePlayer({ personalCartDrop: e.target.checked })}
-                              className="w-3.5 h-3.5 text-swan-green rounded" />
-                            <span className="text-xs text-gray-600">Personal Cart Drop</span>
-                          </label>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-
-                {/* Pricing summary — always visible */}
-                {pricing && (
-                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border-t border-gray-100">
-                    {pricing.lines.map((line, i) => (
-                      <div key={i} className="flex justify-between text-gray-600">
-                        <span>{line.label}</span>
-                        <span>{line.amount === 0 ? "Included" : `$${line.amount.toFixed(2)}`}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between font-semibold border-t border-gray-200 pt-1 mt-1">
-                      <span>Estimated total</span>
-                      <span>${pricing.total.toFixed(2)}</span>
-                    </div>
-                    <p className="text-xs text-gray-400">Fees collected at the clubhouse on arrival.</p>
-                  </div>
-                )}
-
-                {submitStatus && (
-                  <div className={`p-3 rounded-lg text-sm ${submitStatus.type === "error" ? "bg-red-50 text-red-800 border border-red-200" : "bg-green-50 text-green-800 border border-green-200"}`}>
-                    {submitStatus.message}
-                  </div>
-                )}
-
-                <button type="submit" disabled={submitting} className="btn-primary w-full">
-                  {submitting ? "Booking..." : "Confirm Booking"}
-                </button>
               </form>
+            </div>
+
+            {/* Fixed footer with pricing + submit */}
+            <div className="border-t border-gray-100 bg-gray-50/80 px-6 py-3 space-y-2 shrink-0">
+              {submitStatus && (
+                <div className={`p-2.5 rounded-lg text-xs ${submitStatus.type === "error" ? "bg-red-50 text-red-800 border border-red-200" : "bg-green-50 text-green-800 border border-green-200"}`}>
+                  {submitStatus.message}
+                </div>
+              )}
+              {pricing && (
+                <div className="text-sm space-y-2 h-24 overflow-y-auto pr-1">
+                  {pricing.players.map((pl, i) => (
+                    <div key={i} className="space-y-0.5">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 truncate pr-2">
+                          {pl.name}
+                          {pl.isMember && (
+                            <span className="ml-1.5 text-[10px] normal-case tracking-normal text-swan-green font-bold">MEMBER</span>
+                          )}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-gray-900 font-semibold">${pl.subtotal.toFixed(2)}</span>
+                      </div>
+                      {pl.lines.map((l, j) => (
+                        <div key={j} className="flex justify-between text-xs text-gray-500 pl-3">
+                          <span className="truncate pr-2">{l.label}</span>
+                          <span className="shrink-0 tabular-nums">
+                            {l.included ? (
+                              <span className="text-swan-green font-medium">Included</span>
+                            ) : (
+                              `$${l.amount.toFixed(2)}`
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pricing && (
+                <div className="flex justify-between items-baseline border-t border-gray-200 pt-2">
+                  <span className="text-sm font-semibold text-gray-700">Estimated total</span>
+                  <span className="text-xl font-bold text-swan-green tabular-nums">${pricing.total.toFixed(2)}</span>
+                </div>
+              )}
+              {pricing && (
+                <p className="text-[11px] text-gray-400 text-right">Fees collected at the clubhouse on arrival.</p>
+              )}
+              <button
+                type="submit"
+                form="booking-form"
+                disabled={submitting || !groupValidity?.valid || (requireLoginForBooking && !session)}
+                className={`w-full text-base py-3 rounded-lg font-semibold shadow-md hover:shadow-lg transition-colors disabled:shadow-none disabled:opacity-60 disabled:cursor-not-allowed ${
+                  showNameErrors && hasMissingNames
+                    ? "bg-swan-gold text-swan-dark hover:bg-swan-gold/90"
+                    : "btn-primary"
+                }`}
+              >
+                {submitting
+                  ? "Booking…"
+                  : requireLoginForBooking && !session
+                  ? "Sign in required"
+                  : !groupValidity?.valid
+                  ? "Party doesn't fit this time"
+                  : showNameErrors && hasMissingNames
+                  ? missingNamePositions.length === 1
+                    ? "Add player name to continue"
+                    : "Add player names to continue"
+                  : "Confirm Booking"}
+              </button>
             </div>
           </div>
         </div>

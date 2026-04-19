@@ -313,10 +313,16 @@ export default function SettingsPage() {
   const courseOpen = draft["course_open"] === "true";
   const seasonAutoOpen = draft["course_auto_open_date"] ?? "";
   const seasonAutoClose = draft["course_auto_close_date"] ?? "";
+  const requireLoginForBooking = draft["require_login_for_booking"] === "true";
 
   async function handleSeasonToggle(open: boolean) {
     setDraft((d) => ({ ...d, course_open: open ? "true" : "false" }));
     await saveKeys({ course_open: open ? "true" : "false" }, "Course status");
+  }
+
+  async function handleRequireLoginToggle(on: boolean) {
+    setDraft((d) => ({ ...d, require_login_for_booking: on ? "true" : "false" }));
+    await saveKeys({ require_login_for_booking: on ? "true" : "false" }, "Booking sign-in requirement");
   }
 
   async function handleSeasonDateSave() {
@@ -496,6 +502,15 @@ export default function SettingsPage() {
             >
               Save Season Schedule
             </button>
+
+            <div className="pt-4 border-t border-gray-100">
+              <Toggle
+                checked={requireLoginForBooking}
+                onChange={handleRequireLoginToggle}
+                label="Sign in required to book"
+                sublabel="When on, visitors must sign in before reserving a tee time."
+              />
+            </div>
           </div>
         )}
       </section>

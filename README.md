@@ -31,13 +31,16 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 - Concurrency-safe: `BEGIN IMMEDIATE` transaction + unique partial index prevent double-booking
 - Course open/closed toggle with optional auto-open/close dates
 - Configurable booking window (default 8 days ahead)
+- Optional **sign-in-required** mode (Admin → Tee Time Settings): when enabled, clicking a slot redirects to `/login` and the modal re-opens on the same slot and date after the user signs in (state preserved via `sessionStorage`, so it survives OAuth round-trips)
 
 **Booking modal** opens on time slot selection with:
-- Per-player entry: name, member status, equipment checkboxes (Riding Cart, Pull Cart, Club Rental, Personal Cart Drop)
+- Fixed-height modal with scrollable player list; header shows date, centered time (with prev/next arrows to jump to nearby available slots for the current party size), party-size stepper, and 9/18-hole toggle
+- Per-player entry: name, Member/Guest toggle, mutually-exclusive cart choice (Golf Cart / Pull Cart / Cart Drop), independent Club Rental
+- Name required for every player — invalid submits soft-fail with a gold Confirm button ("Add player name(s) to continue") and amber borders on empty inputs
+- Player #1's name is pre-filled from the signed-in session; Member status is auto-checked and locked when their email matches an active membership
 - Email and phone collected for the person making the booking (player #1) only
-- Logged-in members auto-detected — player #1's member checkbox is locked when they have an active membership
 - Cart pairing: riders paired 2-per-cart with half/full cart rates varying by member status and 9/18 holes
-- Live pricing summary always visible: green fees (included for members), cart fees, equipment fees — all pulled from admin rate settings
+- Per-player pricing breakdown in the footer, summed into a live estimated total — all pricing pulled from admin rate settings
 
 **Availability rules (all configurable in Admin → Settings):**
 
@@ -186,7 +189,7 @@ Charges from Toast are tagged with an orange **TOAST** badge in the billing dash
 
 All configuration is stored in the database. Sections:
 
-- **Tee Time Settings** — course open/closed toggle with auto-open/close date scheduling
+- **Tee Time Settings** — course open/closed toggle with auto-open/close date scheduling; optional "sign in required to book" toggle
 - **Announcement Banner** — site-wide dismissible banner for weather alerts, closures, etc.
 - **Course Operation** — booking window, green fees, season dates, tee time hours, clubhouse hours, sunset cutoff, course coordinates
 - **Cart, Equipment & Range Rates** — per-hole member/non-member cart rates, pull cart, club rental, personal cart drop, storage, range fees
