@@ -72,8 +72,9 @@ export async function GET() {
     getConfigValue("course_latitude"),
     getConfigValue("course_longitude"),
   ]);
-  const lat = parseFloat(latStr ?? "47.72");
-  const lng = parseFloat(lngStr ?? "-93.01");
+  // Swan Lake CC, Pengilly, MN — used only when the admin hasn't set coords.
+  const lat = parseFloat(latStr ?? "47.315");
+  const lng = parseFloat(lngStr ?? "-93.192");
   const cacheKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
 
   // Serve from cache when fresh

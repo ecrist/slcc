@@ -32,7 +32,7 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 - Course open/closed toggle with optional auto-open/close dates
 - Configurable booking window (default 8 days ahead)
 - Optional **sign-in-required** mode (Admin → Tee Time Settings): when enabled, clicking a slot redirects to `/login` and the modal re-opens on the same slot and date after the user signs in (state preserved via `sessionStorage`, so it survives OAuth round-trips)
-- **Hourly weather forecast** for the selected date, shown as an hour-by-hour strip above the time-slot grid (Lucide icon, temp, precip %, wind), with a daily summary header — uses Open-Meteo (free, no API key, server-cached 30 min)
+- **Hourly weather forecast** for the selected date, shown as an hour-by-hour strip above the time-slot grid (Lucide icon, temp, precip %), with a daily summary header — uses Open-Meteo (free, no API key, server-cached 30 min). The current hour is highlighted "Now" when viewing today.
 - **Add to Calendar** button on the booking confirmation modal downloads a `.ics` file that imports cleanly into Apple/Google Calendar and Outlook, with a 1-hour reminder pre-set
 
 **Booking modal** opens on time slot selection with:
