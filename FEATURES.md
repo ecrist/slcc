@@ -155,6 +155,10 @@ All managed in Admin → Settings → Cart, Equipment & Range Rates. Used for bo
 - Configurable booking window (`booking_days_ahead`, default 8 days)
 - Past time slots hidden for today; "No tee times available" shown when none remain
 
+**Weather strip:** the `/tee-times` page shows an hourly forecast for the selected date pulled from Open-Meteo (free, no API key) — `/api/weather` proxies the call using `course_latitude`/`course_longitude` and caches in memory for 30 min. The strip sits above the time-slot grid: a header row summarizes the day (Lucide icon, label, hi/lo, precip %, wind mph), and a horizontal scroller below shows hour-by-hour conditions (Lucide icon, temp, precip %, wind) across daylight hours (one hour before sunrise through sunset) so a golfer can pick the best tee time. Hours with rain ≥50% are highlighted blue and ≥18 mph wind is highlighted amber.
+
+**Add to Calendar:** the booking confirmation modal includes an "Add to Calendar" button that downloads a `.ics` file (`src/lib/calendar.ts`) — Apple/Google Calendar and Outlook all import it, with a 1-hour reminder pre-set. Duration is derived from holes (9 ≈ 2h, 18 ≈ 4.5h). The same button appears on every booking row in `/my-bookings`.
+
 **Booking modal:**
 - Opens on time slot selection (no layout shift)
 - Fixed height with only the player list scrolling; hero header shows date overline + centered time (with prev/next chevrons that jump to the nearest available start for the current party size), player stepper, and 9/18-hole toggle
@@ -178,6 +182,21 @@ All managed in Admin → Settings → Cart, Equipment & Range Rates. Used for bo
 7. Equipment availability — capped by inventory minus same-day bookings
 
 **UI slot colors:** available (white), selected start (gold), also-reserved (amber), booked (gray/strikethrough), private event (purple)
+
+---
+
+## My Bookings (`/my-bookings`)
+
+Authenticated page where signed-in users review and manage their tee times. Shows upcoming bookings + the last 10 past bookings, deduplicated by `group_booking_id` so a multi-slot party shows once.
+
+Each booking card has three actions:
+- **Add to Calendar** — downloads the same `.ics` file as the booking confirmation modal (uses `group_booking_id` as the calendar UID, so re-imports update the existing event instead of duplicating).
+- **Rebook next week** — links to `/tee-times?date=…&slot=…` with the booking's date + 7 days, prefilling the booking modal on the same time. The tee-times page's existing URL-param/sessionStorage handler picks it up.
+- **Cancel** — confirmation modal → `DELETE /api/my-bookings?id=<id>` (auth + ownership checked; cascades to all rows of the group). Cancel is hidden for past bookings.
+
+API: `GET /api/my-bookings` returns `{ upcoming, past }` filtered by `LOWER(player_email) = LOWER(session.user.email)`. `DELETE /api/my-bookings?id=N` rejects past dates and bookings owned by other users.
+
+Linked from the user dropdown menu (desktop) and the mobile menu's user section. The page itself bounces unauthenticated visitors to `/login?callbackUrl=/my-bookings`.
 
 ---
 
@@ -348,8 +367,21 @@ NFC cards: UUID token stored on membership (`nfc_token`). iOS uses tap-to-open U
 - Client component using `useSession()` and `usePathname()` for active link highlighting
 - Contains all admin nav links: Dashboard, Tee Sheet, Bookings, Memberships, Billing, Tournaments, Events, Equipment, Settings, Desk Mode
 
-### PWA Install Prompt (`PwaProvider.tsx`)
-- Install popup displays swan logo in white rounded box
+### PWA Install (`PwaProvider.tsx`)
+- React context (`usePwaInstall()`) exposes `{ status, install }` to the rest of the app
+- `status: "android"` — captured `beforeinstallprompt` event; `install()` triggers the native add-to-home-screen prompt
+- `status: "ios"` — iOS Safari (iOS Safari never fires `beforeinstallprompt`); `install()` opens an instructions modal showing the 3-step Share → Add to Home Screen flow with rendered iOS share-sheet icon
+- `status: "unsupported"` — already in standalone mode, or browser can't install; the entry point is hidden
+- Listens for `appinstalled` to flip back to `"unsupported"` after a successful install
+- Header surfaces an "Install App" entry in both the desktop user menu and the mobile menu (visible to signed-out users on mobile too)
+- Service worker registration unchanged (production-only)
+
+### Pull-to-Refresh (`PullToRefresh.tsx`)
+- Standalone-PWA only — detects via `display-mode: standalone` + iOS legacy `navigator.standalone`
+- Damped pull (factor 0.5, max 140 px); threshold 80 px commits a `location.reload()`
+- Translates `#ptr-page` (sibling, not parent of the spinner — preserves `position: fixed` containing block)
+- Skipped when scroll position > 0 or body scroll is locked (modal open)
+- Spinner sits in a fixed flex container whose height matches the page's `translateY` so it stays geometrically centered in the revealed bar at any pull distance
 
 ---
 
@@ -395,6 +427,9 @@ Emails sent for:
 | DELETE | `/api/tournaments/[id]/enter` | Withdraw |
 | GET | `/api/config/public` | Square app ID + location ID for browser |
 | GET/PATCH | `/api/user/settings` | User profile + linked membership info (auth required) |
+| GET | `/api/my-bookings` | Logged-in user's upcoming + past tee times |
+| DELETE | `/api/my-bookings?id=N` | Cancel a booking (owner only, future dates only) |
+| GET | `/api/weather` | 10-day forecast from Open-Meteo for the configured course coords (in-memory cached 30 min) |
 | POST | `/api/auth/register` | Create user account (auto-links memberships by email) |
 
 ### Admin (require admin session)

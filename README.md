@@ -32,6 +32,8 @@ Online booking, membership, billing, and club management portal for [Swan Lake C
 - Course open/closed toggle with optional auto-open/close dates
 - Configurable booking window (default 8 days ahead)
 - Optional **sign-in-required** mode (Admin → Tee Time Settings): when enabled, clicking a slot redirects to `/login` and the modal re-opens on the same slot and date after the user signs in (state preserved via `sessionStorage`, so it survives OAuth round-trips)
+- **Hourly weather forecast** for the selected date, shown as an hour-by-hour strip above the time-slot grid (Lucide icon, temp, precip %, wind), with a daily summary header — uses Open-Meteo (free, no API key, server-cached 30 min)
+- **Add to Calendar** button on the booking confirmation modal downloads a `.ics` file that imports cleanly into Apple/Google Calendar and Outlook, with a 1-hour reminder pre-set
 
 **Booking modal** opens on time slot selection with:
 - Fixed-height modal with scrollable player list; header shows date, centered time (with prev/next arrows to jump to nearby available slots for the current party size), party-size stepper, and 9/18-hole toggle
@@ -88,6 +90,15 @@ Authenticated users can manage their profile:
 - **Profile:** Edit name, email, phone number
 - **Password:** Change password (requires current password verification)
 - **Membership info:** View linked membership details (member number, type, status, season, payment) or link to purchase page
+
+### My Bookings (`/my-bookings`)
+
+A dedicated page where signed-in users review and manage their tee times — linked from the user dropdown menu (desktop) and the mobile menu's user section.
+
+- Lists upcoming reservations plus the last 10 past bookings (deduplicated for multi-slot parties)
+- **Add to Calendar** — same `.ics` download as the booking confirmation modal
+- **Rebook next week** — one-tap link to `/tee-times` with the same time pre-selected, 7 days later
+- **Cancel** — confirmation modal → cancels the entire group at the server (auth + ownership checked)
 
 ### Tournaments (`/tournaments`)
 
@@ -228,7 +239,9 @@ Full-screen kiosk for the pro shop counter. Installable as a PWA on any device.
 - **NFC Member Check-In** — tap card/fob to look up member and check in to tee time
 - **Member Search** — manual lookup by name or member number
 
-**PWA installation:** iOS → Safari Share → Add to Home Screen. Android/Desktop → Chrome install prompt or address bar icon.
+**PWA installation:** Every page exposes an **Install App** entry in the user menu (desktop) and mobile menu. On Android/Chrome it triggers the native install prompt; on iOS Safari it opens a 3-step instructions modal (Share → Add to Home Screen → Add). The entry hides automatically once the app is in standalone mode.
+
+Once installed, the home-screen app supports **pull-to-refresh** — swipe down at the top of any page to reload, since iOS standalone mode doesn't include the native browser gesture.
 
 ---
 
@@ -385,7 +398,9 @@ src/
     Header.tsx                  # Site header with initials avatar dropdown
     AdminBar.tsx                # Global admin nav bar (visible to admins on all pages)
     Footer.tsx
-    PwaProvider.tsx             # PWA install prompt with swan logo
+    PwaProvider.tsx             # PWA install context (Android auto-install + iOS instructions modal)
+    PullToRefresh.tsx           # Pull-to-refresh for iOS PWA standalone mode
+    WeatherStrip.tsx            # Weather component + useWeather() hook for tee-times page
     SquareWalletButtons.tsx     # Google Pay / Apple Pay (fetches config at runtime)
   lib/
     db/
@@ -393,6 +408,7 @@ src/
       setup.ts                  # Dev seed script
     admin.ts                    # isAdminEmail(), getConfigValue()
     email.ts                    # SMTP transactional email
+    calendar.ts                 # .ics builder + downloader for tee time bookings
     sunset.ts                   # Astronomical sunset calculation (no API key)
     square/client.ts            # Square client (reads credentials from DB)
     types.ts                    # Shared types, MEMBERSHIP_TYPES, TEE_TIME_SLOTS
@@ -422,6 +438,9 @@ src/
 | POST | `/api/events/[id]/register` | Register for an event |
 | GET | `/api/config/public` | Square app ID / location ID for browser |
 | GET/PATCH | `/api/user/settings` | User profile + linked membership (auth required) |
+| GET | `/api/my-bookings` | Logged-in user's upcoming + past tee times |
+| DELETE | `/api/my-bookings?id=` | Cancel a booking (owner only, future dates only) |
+| GET | `/api/weather` | 10-day forecast for the configured course coordinates (Open-Meteo, cached 30 min) |
 
 ### Admin Endpoints (require admin session)
 

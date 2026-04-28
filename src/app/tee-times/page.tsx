@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { TEE_TIME_SLOTS } from "@/lib/types";
 import { SkeletonSlotGrid } from "@/components/Skeleton";
+import { downloadTeeTimeIcs } from "@/lib/calendar";
+import WeatherStrip, { useWeather } from "@/components/WeatherStrip";
 
 interface BookedSlot {
   time: string;
@@ -96,6 +98,7 @@ function readPendingBookingOnce(): PendingBooking | null {
 
 export default function TeeTimesPage() {
   const { data: session } = useSession();
+  const { loading: weatherLoading, byDate: weatherByDate } = useWeather();
   const [selectedDate, setSelectedDate] = useState("");
   const [players, setPlayers] = useState(2);
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
@@ -607,6 +610,11 @@ export default function TeeTimesPage() {
       </div>
 
       <div className="animate-fade-in-up stagger-3">
+        {/* Weather strip for the selected date */}
+        <WeatherStrip
+          forecast={weatherByDate[selectedDate] ?? null}
+          loading={weatherLoading && !weatherByDate[selectedDate]}
+        />
         {/* Time Slots */}
         <div>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -1192,12 +1200,30 @@ export default function TeeTimesPage() {
                   <span className="font-semibold">{bookingConfirmation.name}</span>
                 </div>
               </div>
-              <button
-                onClick={() => setBookingConfirmation(null)}
-                className="btn-primary w-full"
-              >
-                Done
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => downloadTeeTimeIcs({
+                    date: bookingConfirmation.date,
+                    time: bookingConfirmation.time,
+                    holes: parseInt(bookingConfirmation.holes) || 18,
+                    players: bookingConfirmation.players,
+                    name: bookingConfirmation.name,
+                    uid: bookingConfirmation.groupId || undefined,
+                  })}
+                  className="w-full btn-outline border-swan-green text-swan-green hover:bg-swan-green hover:text-white text-sm py-2.5 inline-flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75M12 12.75v6m-3-3h6" />
+                  </svg>
+                  Add to Calendar
+                </button>
+                <button
+                  onClick={() => setBookingConfirmation(null)}
+                  className="btn-primary w-full"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         </div>

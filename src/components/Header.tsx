@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { usePwaInstall } from "@/components/PwaProvider";
 
 function UserInitials({ name, email }: { name?: string | null; email?: string | null }) {
   const initials = (name || email || "?")
@@ -26,6 +27,8 @@ export default function Header() {
   const [contactPhone, setContactPhone] = useState("(218) 885-3543");
   const [contactEmail, setContactEmail] = useState("golf@swanlakecc.com");
   const { data: session } = useSession();
+  const { status: pwaStatus, install: pwaInstall } = usePwaInstall();
+  const canShowInstall = pwaStatus !== "unsupported";
   const router = useRouter();
   const pathname = usePathname();
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -137,6 +140,16 @@ export default function Header() {
                       <p className="text-gray-500 text-xs truncate">{session.user?.email}</p>
                     </div>
                     <Link
+                      href="/my-bookings"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                      </svg>
+                      My Bookings
+                    </Link>
+                    <Link
                       href="/settings"
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -147,6 +160,17 @@ export default function Header() {
                       </svg>
                       Settings
                     </Link>
+                    {canShowInstall && (
+                      <button
+                        onClick={() => { setUserMenuOpen(false); pwaInstall(); }}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-swan-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Install App
+                      </button>
+                    )}
                     <button
                       onClick={async () => {
                         setUserMenuOpen(false);
@@ -227,9 +251,20 @@ export default function Header() {
                       <p className="text-white/50 text-xs">{session.user?.email}</p>
                     </div>
                   </div>
+                  <Link href="/my-bookings" className="block text-white/80 hover:text-white font-medium text-sm mb-2" onClick={() => setMobileOpen(false)}>
+                    My Bookings
+                  </Link>
                   <Link href="/settings" className="block text-white/80 hover:text-white font-medium text-sm" onClick={() => setMobileOpen(false)}>
                     Settings
                   </Link>
+                  {canShowInstall && (
+                    <button
+                      onClick={() => { setMobileOpen(false); pwaInstall(); }}
+                      className="block text-swan-gold hover:text-swan-gold-light font-medium text-sm mt-2"
+                    >
+                      Install App
+                    </button>
+                  )}
                   <button
                     onClick={async () => { await signOut({ redirect: false }); setMobileOpen(false); router.push("/"); }}
                     className="block text-white/60 hover:text-white font-medium text-sm mt-2"
@@ -239,12 +274,22 @@ export default function Header() {
                 </div>
               </>
             ) : (
-              <button
-                onClick={() => { router.push("/login"); setMobileOpen(false); }}
-                className="block text-swan-gold hover:text-swan-gold-light font-medium"
-              >
-                Sign In
-              </button>
+              <div className="border-t border-white/10 pt-3 mt-1 space-y-2">
+                <button
+                  onClick={() => { router.push("/login"); setMobileOpen(false); }}
+                  className="block text-swan-gold hover:text-swan-gold-light font-medium"
+                >
+                  Sign In
+                </button>
+                {canShowInstall && (
+                  <button
+                    onClick={() => { setMobileOpen(false); pwaInstall(); }}
+                    className="block text-white/80 hover:text-white font-medium text-sm"
+                  >
+                    Install App
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
